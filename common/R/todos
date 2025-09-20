@@ -1,0 +1,218 @@
+Warning: Error in group_by: Must group by variables found in `.data`.
+✖ Column `section_name` is not found.
+  215: <Anonymous>
+  214: signalCondition
+  213: signal_abort
+  212: abort
+  211: group_by_prepare
+  210: group_by.data.frame
+  209: group_by
+  208: summarise
+  207: ungroup
+  206: left_join
+  205: %>%
+  204: p_aggregate_products
+  203: p_aggregate_by_section
+  202: group_by
+  201: summarise
+  200: mutate
+  199: filter
+  198: mutate
+  197: group_by
+  196: summarise
+  195: ungroup
+  194: list2
+  193: bind_rows
+  192: %>%
+  191: cachedReactiveValueFunc [/home/pacha/Documents/visualization-with-shiny/countryprofiles/R/app_server.R#487]
+  189: valueFunc
+  170: func
+  168: f
+  167: Reduce
+  158: do
+  157: hybrid_chain
+  156: eventReactiveValueFunc
+  104: exp_col_dtl_yr
+  103: shinyRenderWidget [/home/pacha/Documents/visualization-with-shiny/countryprofiles/R/app_server.R#767]
+  102: func
+   89: renderFunc
+   88: output$exp_col_dtl_yr
+    3: runApp
+    2: print.shiny.appobj
+    1: <Anonymous>
+Warning: Error in group_by: Must group by variables found in `.data`.
+✖ Column `section_name` is not found.
+  205: <Anonymous>
+  204: signalCondition
+  203: signal_abort
+  202: abort
+  201: group_by_prepare
+  200: group_by.data.frame
+  199: group_by
+  198: summarise
+  197: ungroup
+  196: left_join
+  195: %>%
+  194: p_aggregate_products
+  193: p_aggregate_by_section
+  192: %>%
+  191: cachedReactiveValueFunc [/home/pacha/Documents/visualization-with-shiny/countryprofiles/R/app_server.R#566]
+  189: valueFunc
+  170: func
+  168: f
+  167: Reduce
+  158: do
+  157: hybrid_chain
+  156: eventReactiveValueFunc
+  104: exp_tm_dtl_min_yr
+  103: shinyRenderWidget [/home/pacha/Documents/visualization-with-shiny/countryprofiles/R/app_server.R#771]
+  102: func
+   89: renderFunc
+   88: output$exp_tm_dtl_min_yr
+    3: runApp
+    2: print.shiny.appobj
+    1: <Anonymous>
+Warning: Error in group_by: Must group by variables found in `.data`.
+✖ Column `section_name` is not found.
+  205: <Anonymous>
+  204: signalCondition
+  203: signal_abort
+  202: abort
+  201: group_by_prepare
+  200: group_by.data.frame
+  199: group_by
+  198: summarise
+  197: ungroup
+  196: left_join
+  195: %>%
+  194: p_aggregate_products
+  193: p_aggregate_by_section
+  192: %>%
+  191: cachedReactiveValueFunc [/home/pacha/Documents/visualization-with-shiny/countryprofiles/R/app_server.R#582]
+  189: valueFunc
+  170: func
+  168: f
+  167: Reduce
+  158: do
+  157: hybrid_chain
+  156: eventReactiveValueFunc
+  104: exp_tm_dtl_max_yr
+  103: shinyRenderWidget [/home/pacha/Documents/visualization-with-shiny/countryprofiles/R/app_server.R#775]
+  102: func
+   89: renderFunc
+   88: output$exp_tm_dtl_max_yr
+    3: runApp
+    2: print.shiny.appobj
+    1: <Anonymous>
+Warning: Error in group_by: Must group by variables found in `.data`.
+✖ Column `section_name` is not found.
+  215: <Anonymous>
+  214: signalCondition
+  213: signal_abort
+  212: abort
+  211: group_by_prepare
+  210: group_by.data.frame
+  209: group_by
+  208: summarise
+  207: ungroup
+  206: left_join
+  205: %>%
+  204: p_aggregate_products
+  203: p_aggregate_by_section
+  202: group_by
+  201: summarise
+  200: mutate
+  199: filter
+  198: mutate
+  197: group_by
+  196: summarise
+  195: ungroup
+  194: list2
+  193: bind_rows
+  192: %>%
+  191: cachedReactiveValueFunc [/home/pacha/Documents/visualization-with-shiny/countryprofiles/R/app_server.R#611]
+  189: valueFunc
+  170: func
+  168: f
+  167: Reduce
+  158: do
+  157: hybrid_chain
+  156: eventReactiveValueFunc
+  104: imp_col_dtl_yr
+  103: shinyRenderWidget [/home/pacha/Documents/visualization-with-shiny/countryprofiles/R/app_server.R#782]
+  102: func
+   89: renderFunc
+   88: output$imp_col_dtl_yr
+    3: runApp
+    2: print.shiny.appobj
+    1: <Anonymous>
+Warning: Error in group_by: Must group by variables found in `.data`.
+✖ Column `section_name` is not found.
+  205: <Anonymous>
+  204: signalCondition
+  203: signal_abort
+  202: abort
+  201: group_by_prepare
+  200: group_by.data.frame
+  199: group_by
+  198: summarise
+  197: ungroup
+  196: left_join
+  195: %>%
+  194: p_aggregate_products
+  193: p_aggregate_by_section
+  192: %>%
+  191: cachedReactiveValueFunc [/home/pacha/Documents/visualization-with-shiny/countryprofiles/R/app_server.R#686]
+  189: valueFunc
+  170: func
+  168: f
+  167: Reduce
+  158: do
+  157: hybrid_chain
+  156: eventReactiveValueFunc
+  104: imp_tm_dtl_min_yr
+  103: shinyRenderWidget [/home/pacha/Documents/visualization-with-shiny/countryprofiles/R/app_server.R#786]
+  102: func
+   89: renderFunc
+   88: output$imp_tm_dtl_min_yr
+    3: runApp
+    2: print.shiny.appobj
+    1: <Anonymous>
+Warning: Error in group_by: Must group by variables found in `.data`.
+✖ Column `section_name` is not found.
+  205: <Anonymous>
+  204: signalCondition
+  203: signal_abort
+  202: abort
+  201: group_by_prepare
+  200: group_by.data.frame
+  199: group_by
+  198: summarise
+  197: ungroup
+  196: left_join
+  195: %>%
+  194: p_aggregate_products
+  193: p_aggregate_by_section
+  192: %>%
+  191: cachedReactiveValueFunc [/home/pacha/Documents/visualization-with-shiny/countryprofiles/R/app_server.R#702]
+  189: valueFunc
+  170: func
+  168: f
+  167: Reduce
+  158: do
+  157: hybrid_chain
+  156: eventReactiveValueFunc
+  104: imp_tm_dtl_max_yr
+  103: shinyRenderWidget [/home/pacha/Documents/visualization-with-shiny/countryprofiles/R/app_server.R#790]
+  102: func
+   89: renderFunc
+   88: output$imp_tm_dtl_max_yr
+    3: runApp
+    2: print.shiny.appobj
+    1: <Anonymous>
+Input to asJSON(keep_vec_names=TRUE) is a named vector. In a future version of jsonlite, this option will not be supported, and named vectors will be translated into arrays instead of objects. If you want JSON object output, please use a named list instead. See ?toJSON.
+Input to asJSON(keep_vec_names=TRUE) is a named vector. In a future version of jsonlite, this option will not be supported, and named vectors will be translated into arrays instead of objects. If you want JSON object output, please use a named list instead. See ?toJSON.
+Input to asJSON(keep_vec_names=TRUE) is a named vector. In a future version of jsonlite, this option will not be supported, and named vectors will be translated into arrays instead of objects. If you want JSON object output, please use a named list instead. See ?toJSON.
+Input to asJSON(keep_vec_names=TRUE) is a named vector. In a future version of jsonlite, this option will not be supported, and named vectors will be translated into arrays instead of objects. If you want JSON object output, please use a named list instead. See ?toJSON.
+Input to asJSON(keep_vec_names=TRUE) is a named vector. In a future version of jsonlite, this option will not be supported, and named vectors will be translated into arrays instead of objects. If you want JSON object output, please use a named list instead. See ?toJSON.
+Input to asJSON(keep_vec_names=TRUE) is a named vector. In a future version of jsonlite, this option will not be supported, and named vectors will be translated into arrays instead of objects. If you want JSON object output, please use a named list instead. See ?toJSON.

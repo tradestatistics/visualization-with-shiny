@@ -8,7 +8,6 @@
 \alias{available_sections_code}
 \alias{available_commodities_code}
 \alias{available_commodities_short_code}
-\alias{available_vaccine}
 \alias{available_yrs}
 \alias{available_yrs_deflator}
 \alias{available_yrs_min}
@@ -28,8 +27,6 @@ available_sections_code()
 available_commodities_code()
 
 available_commodities_short_code()
-
-available_vaccine()
 
 available_yrs()
 

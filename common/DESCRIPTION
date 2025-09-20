@@ -1,16 +1,14 @@
 Package: otsshinycommon
 Title: Open Trade Statistics Helpers and Common Functions/Data
-Version: 2024.08.22
-Authors@R: person('Mauricio', 'Vargas', email = 'mavargas11@uc.cl', role = c('cre', 'aut'))
+Version: 2025.09.20
+Authors@R: person('Mauricio', 'Vargas', email = 'm.vargas.sepulveda@gmail.com', role = c('cre', 'aut'))
 Description: Functions and data shared across the different Shiny apps that
-    create tradestatistics.io.
+    I use for tradestatistics.io.
 License: Apache License (>= 2)
 URL: https://github.com/tradestatistics/visualization-with-shiny
 BugReports: https://github.com/tradestatistics/visualization-with-shiny/issues
 Imports: 
     dplyr (>= 1.0.9),
-    fixest (>= 0.10.4),
-    GEGravity,
     highcharter,
     magrittr (>= 2.0.3),
     pool (>= 0.1.6),
@@ -23,9 +21,6 @@ Suggests:
 Encoding: UTF-8
 Language: en-US
 LazyData: true
-RoxygenNote: 7.3.1
+RoxygenNote: 7.3.2
 Depends: 
-    R (>= 2.10)
-Remotes:
-  r-econometrics/GEGravity,
-  r-dbi/RPostgres
+    R (>= 3.5)

@@ -62,7 +62,7 @@ app_ui <- function(request) {
                   "Years",
                   min = available_yrs_min(),
                   max = available_yrs_max(),
-                  value = c(2016, 2020),
+                  value = c(2018, 2023),
                   sep = "",
                   step = 1,
                   ticks = FALSE,
@@ -74,9 +74,9 @@ app_ui <- function(request) {
                   "r",
                   "Reporter",
                   choices = sort(available_reporters_iso()[
-                    available_reporters_iso() != "all"
+                    available_reporters_iso() != "ALL"
                   ]),
-                  selected = "can",
+                  selected = "GBR",
                   selectize = TRUE,
                   width = "100%"
                 )
@@ -85,8 +85,11 @@ app_ui <- function(request) {
                 selectInput(
                   "p",
                   "Partner",
-                  choices = NULL,
-                  selected = NULL,
+                  choices = c(
+                      "All countries" = "ALL",
+                      sort(available_reporters_iso()[available_reporters_iso() != "ALL"])
+                    ),
+                  selected = "ALL",
                   selectize = TRUE,
                   width = "100%"
                 )

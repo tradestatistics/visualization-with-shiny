@@ -46,20 +46,14 @@ available_commodities_short_code <- function() {
 
 #' @rdname available
 #' @export
-available_vaccine <- function() {
-  c("Vaccine Inputs" = "vaccine")
-}
-
-#' @rdname available
-#' @export
 available_yrs <- function() {
-  1980L:2021L
+  1988L:2023L
 }
 
 #' @rdname available
 #' @export
 available_yrs_deflator <- function() {
-  1981L:2021L
+  1989L:2023L
 }
 
 #' @rdname available

@@ -5,6 +5,6 @@
 \alias{commodities_display}
 \title{commodities_display}
 \description{
-Internal dataset for commodity codes (5,304 codes).
+Internal dataset for commodity codes (6,898 codes).
 }
 \keyword{datasets}

@@ -6,7 +6,7 @@
 \alias{otsshinycommon-package}
 \title{otsshinycommon: Open Trade Statistics Helpers and Common Functions/Data}
 \description{
-Functions and data shared across the different Shiny apps that create tradestatistics.io.
+Functions and data shared across the different Shiny apps that I use for tradestatistics.io.
 }
 \seealso{
 Useful links:
@@ -17,7 +17,7 @@ Useful links:
 
 }
 \author{
-\strong{Maintainer}: Mauricio Vargas \email{mavargas11@uc.cl}
+\strong{Maintainer}: Mauricio Vargas \email{m.vargas.sepulveda@gmail.com}
 
 }
 \keyword{internal}

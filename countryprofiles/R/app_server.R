@@ -4,8 +4,8 @@
 #'     DO NOT REMOVE.
 #' @import otsshinycommon
 #' @importFrom dplyr arrange bind_rows case_when collect dense_rank desc
-#'     everything filter group_by inner_join left_join mutate select summarise
-#'     tbl tibble ungroup
+#'     distinct everything filter group_by inner_join left_join mutate select summarise
+#'     tbl tibble ungroup pull slice_head
 #' @importFrom forcats fct_lump_n
 #' @importFrom glue glue
 #' @importFrom highcharter hcaes hchart hc_title hc_xAxis
@@ -50,61 +50,44 @@ app_server <- function(input, output, session) {
   }) # format
 
   tbl_agg <- eventReactive(input$go, {
-    ifelse(inp_p() == "all", "yr", "yrp")
+    ifelse(inp_p() == "ALL", "yr", "yrp")
   })
 
   tbl_dtl <- eventReactive(input$go, {
-    ifelse(inp_p() == "all", "yrc", "yrpc")
+    ifelse(inp_p() == "ALL", "yrc", "yrpc")
   })
 
+  # Human-readable reporter/partner names for glue templates. Fallback to
+  # the code when no display name is available.
   rname <- eventReactive(input$go, {
-    names(otsshinycommon::reporters_display[
-      otsshinycommon::reporters_display == inp_r()
-    ])
+    out <- names(available_reporters_iso()[available_reporters_iso() == inp_r()])
+    if (length(out) == 0 || is.na(out) || nchar(out) == 0) return(inp_r())
+    out
   })
 
   pname <- eventReactive(input$go, {
-    names(otsshinycommon::reporters_display[
-      otsshinycommon::reporters_display == inp_p()
-    ])
+    out <- names(available_reporters_iso()[available_reporters_iso() == inp_p()])
+    if (length(out) == 0 || is.na(out) || nchar(out) == 0) return(inp_p())
+    out
   })
 
-  # Titles ----
+  # use p_add_the function from common package with inp_p() when needed
 
-  r_add_the <- eventReactive(input$go, {
-    if (substr(rname(), 1, 6) == "United" |
-      substr(rname(), 1, 3) == "USA" |
-      substr(rname(), 1, 7) == "Russian") {
-      "the"
-    } else {
-      ""
+  # Small name helpers (restore behaviour when earlier definitions were lost)
+  # rname/pname not needed; use inp_r()/inp_p() directly in glue expressions
+
+  # Ensure data frame contains expected columns to avoid mutate/group_by errors
+  ensure_cols <- function(df, cols) {
+    for (c in cols) {
+      if (!c %in% names(df)) df[[c]] <- NA_character_
     }
-  })
-
-  r_add_upp_the <- eventReactive(input$go, {
-    if (substr(rname(), 1, 6) == "United" |
-      substr(rname(), 1, 3) == "USA" |
-      substr(rname(), 1, 7) == "Russian") {
-      "The"
-    } else {
-      ""
-    }
-  })
-
-  p_add_the <- eventReactive(input$go, {
-    if (substr(pname(), 1, 6) == "United" |
-      substr(pname(), 1, 3) == "USA" |
-      substr(pname(), 1, 7) == "Russian") {
-      "the"
-    } else {
-      ""
-    }
-  })
+    df
+  }
 
   title <- eventReactive(input$go, {
     switch(tbl_dtl(),
-      "yrc" = glue("{ r_add_upp_the() } { rname() } multilateral trade between { min(inp_y()) } and { max(inp_y()) }"),
-      "yrpc" = glue("{ r_add_upp_the() } { rname() } and { p_add_the() } { pname() } trade between { min(inp_y()) } and { max(inp_y()) }")
+  "yrc" = glue("{ r_add_upp_the(rname()) } { rname() } multilateral trade between { min(inp_y()) } and { max(inp_y()) }"),
+  "yrpc" = glue("{ r_add_upp_the(rname()) } { rname() } and { p_add_the(pname()) } { pname() } trade between { min(inp_y()) } and { max(inp_y()) }")
     )
   })
 
@@ -119,7 +102,7 @@ app_server <- function(input, output, session) {
 
     d <- tbl(con, tbl_agg())
 
-    if (inp_p() == "all") {
+    if (inp_p() == "ALL") {
       d <- d %>%
         filter(
           !!sym("year") %in% !!inp_y() &
@@ -150,7 +133,7 @@ app_server <- function(input, output, session) {
   df_dtl <- reactive({
     d <- tbl(con, tbl_dtl())
 
-    if (inp_p() == "all") {
+    if (inp_p() == "ALL") {
       d <- d %>%
         filter(
           !!sym("year") %in% !!inp_y() &
@@ -165,7 +148,14 @@ app_server <- function(input, output, session) {
         )
     }
 
-    d <- d %>% collect()
+    d <- d %>%
+      inner_join(
+        tbl(con, "commodities") %>%
+          distinct(!!sym("commodity_code"), !!sym("section_code"), !!sym("section_name"), !!sym("section_color")),
+        by = c("commodity_code", "section_code")
+      )
+
+    d <- collect(d)
 
     if (inp_d() != "No") {
       d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
@@ -399,14 +389,14 @@ app_server <- function(input, output, session) {
 
   trd_smr_txt_exp <- eventReactive(input$go, {
     switch(tbl_agg(),
-      "yr" = glue("The exports of { r_add_the() } { rname() } to the World { exports_growth_increase_decrease() } from
+  "yr" = glue("The exports of { r_add_the(rname()) } { rname() } to the World { exports_growth_increase_decrease() } from
                           { exp_val_min_yr_2() } in { min(inp_y()) } to { exp_val_max_yr_2() } in { max(inp_y()) }
                           (annualized { exports_growth_increase_decrease_2() } of { exports_growth_2() })."),
-      "yrp" = glue("The exports of { r_add_the() } { rname() } to { p_add_the() } { pname() } { exports_growth_increase_decrease() } from
+  "yrp" = glue("The exports of { r_add_the(rname()) } { rname() } to { p_add_the(pname()) } { pname() } { exports_growth_increase_decrease() } from
                           { exp_val_min_yr_2() } in { min(inp_y()) }
                           to { exp_val_max_yr_2() } in { max(inp_y()) } (annualized { exports_growth_increase_decrease_2() } of
                           { exports_growth_2() }). { p_add_the() } { pname() } was the No. { trd_rankings_no_min_yr() } trading partner of
-                          { r_add_the() } { rname() } in { min(inp_y()) } (represented { trd_rankings_exp_share_min_yr_2() } of its exports), and
+          { r_add_the(rname()) } { rname() } in { min(inp_y()) } (represented { trd_rankings_exp_share_min_yr_2() } of its exports), and
                           then { trd_rankings_remained() } No. { trd_rankings_no_max_yr() } in { max(inp_y()) } (represented { trd_rankings_exp_share_max_yr_2() }
                           of its exports).")
     )
@@ -414,14 +404,14 @@ app_server <- function(input, output, session) {
 
   trd_smr_txt_imp <- eventReactive(input$go, {
     switch(tbl_agg(),
-      "yr" = glue("The imports of { r_add_the() } { rname() } to the World { imports_growth_increase_decrease() } from
+  "yr" = glue("The imports of { r_add_the(rname()) } { rname() } to the World { imports_growth_increase_decrease() } from
                          { imp_val_min_yr_2() } in { min(inp_y()) } to { imp_val_max_yr_2() } in { max(inp_y()) }
                          (annualized { imports_growth_increase_decrease_2() } of { imports_growth_2() })."),
-      "yrp" = glue("The imports of { r_add_the() } { rname() } to { p_add_the() } { pname() } { imports_growth_increase_decrease() } from
+  "yrp" = glue("The imports of { r_add_the(rname()) } { rname() } to { p_add_the(pname()) } { pname() } { imports_growth_increase_decrease() } from
                           { imp_val_min_yr_2() } in { min(inp_y()) }
                           to { imp_val_max_yr_2() } in { max(inp_y()) } (annualized { imports_growth_increase_decrease_2() } of
                           { imports_growth_2() }). { p_add_the() } { pname() } was the No. { trd_rankings_no_min_yr() } trading partner of
-                          { r_add_the() } { rname() } in { min(inp_y()) } (represented { trd_rankings_imp_share_min_yr_2() } of its imports), and
+          { r_add_the(rname()) } { rname() } in { min(inp_y()) } (represented { trd_rankings_imp_share_min_yr_2() } of its imports), and
                           then { trd_rankings_remained() } No. { trd_rankings_no_max_yr() } in { max(inp_y()) } (represented { trd_rankings_imp_share_max_yr_2() }
                           of its imports).")
     )
@@ -429,8 +419,8 @@ app_server <- function(input, output, session) {
 
   trd_exc_columns_title <- eventReactive(input$go, {
     switch(tbl_agg(),
-      "yr" = glue("{ r_add_upp_the() } { rname() } multilateral trade between { min(inp_y()) } and { max(inp_y()) }"),
-      "yrp" = glue("{ r_add_upp_the() } { rname() } and { p_add_the() } { pname() } exchange between { min(inp_y()) } and { max(inp_y()) }")
+  "yr" = glue("{ r_add_upp_the(rname()) } { rname() } multilateral trade between { min(inp_y()) } and { max(inp_y()) }"),
+  "yrp" = glue("{ r_add_upp_the(rname()) } { rname() } and { p_add_the(pname()) } { pname() } exchange between { min(inp_y()) } and { max(inp_y()) }")
     )
   })
 
@@ -487,8 +477,8 @@ app_server <- function(input, output, session) {
     d <- df_dtl() %>%
       filter(!!sym("year") == min(inp_y())) %>%
       p_aggregate_by_section(col = "trade_value_usd_exp", con = con) %>%
-      group_by(!!sym("section_name")) %>%
-      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE)) %>%
+      group_by(!!sym("section_name"), !!sym("section_color")) %>%
+      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop") %>%
       mutate(year = min(inp_y())) %>%
       filter(!!sym("trade_value") > 0) %>%
       mutate(section_name = fct_lump_n(
@@ -497,15 +487,19 @@ app_server <- function(input, output, session) {
         w = !!sym("trade_value"),
         other_level = "Other products"
       )) %>%
-      group_by(!!sym("year"), !!sym("section_name")) %>%
-      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE)) %>%
-      ungroup() %>%
+      # Assign neutral color to "Other products"
+      mutate(section_color = case_when(
+        as.character(!!sym("section_name")) == "Other products" ~ "#434348",
+        TRUE ~ !!sym("section_color")
+      )) %>%
+      group_by(!!sym("year"), !!sym("section_name"), !!sym("section_color")) %>%
+      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop") %>%
       bind_rows(
         df_dtl() %>%
           filter(!!sym("year") == max(inp_y())) %>%
           p_aggregate_by_section(col = "trade_value_usd_exp", con = con) %>%
-          group_by(!!sym("section_name")) %>%
-          summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE)) %>%
+          group_by(!!sym("section_name"), !!sym("section_color")) %>%
+          summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop") %>%
           mutate(year = max(inp_y())) %>%
           filter(!!sym("trade_value") > 0) %>%
           mutate(section_name = fct_lump_n(
@@ -514,24 +508,18 @@ app_server <- function(input, output, session) {
             w = !!sym("trade_value"),
             other_level = "Other products"
           )) %>%
-          group_by(!!sym("year"), !!sym("section_name")) %>%
-          summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE)) %>%
-          ungroup()
+          # Assign neutral color to "Other products"
+          mutate(section_color = case_when(
+            as.character(!!sym("section_name")) == "Other products" ~ "#434348",
+            TRUE ~ !!sym("section_color")
+          )) %>%
+          group_by(!!sym("year"), !!sym("section_name"), !!sym("section_color")) %>%
+          summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop")
       )
-
+    
     d <- d %>%
-      left_join(
-        p_colors(d, con = con)
-      ) %>%
-      mutate(
-        section_color = case_when(
-          is.na(!!sym("section_color")) ~ "#434348",
-          TRUE ~ !!sym("section_color")
-        )
-      )
-
-    d <- d %>%
-      mutate(section_name = ifelse(nchar(section_name) <= 30, section_name,
+      mutate(section_name = as.character(!!sym("section_name"))) %>%
+      mutate(section_name = ifelse(nchar(!!sym("section_name")) <= 30, !!sym("section_name"),
         paste0(sub("^(\\S*\\s+\\S+\\S*\\s+\\S+\\S*\\s+\\S+\\S*\\s+\\S+).*", "\\1", section_name), "...")
       ))
 
@@ -563,11 +551,47 @@ app_server <- function(input, output, session) {
   })
 
   exp_tm_dtl_min_yr <- reactive({
-    d <- df_dtl() %>%
-      filter(!!sym("year") == min(inp_y())) %>%
-      p_aggregate_by_section(col = "trade_value_usd_exp", con = con)
+    # canonical commodities reference (preserve codes and short codes)
+    commodities_ref <- tbl(con, "commodities") %>%
+      distinct(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short")) %>%
+      collect()
 
-    d2 <- p_colors(d, con = con)
+    # aggregate raw data by section/commodity (keep section_code)
+    d_raw <- df_dtl() %>%
+      filter(!!sym("year") == min(inp_y())) %>%
+      p_aggregate_by_section(col = "trade_value_usd_exp", con = con) %>%
+      filter(!!sym("trade_value") > 0) %>%
+      group_by(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short"), !!sym("commodity_name")) %>%
+      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop")
+
+    # left-join onto canonical commodities to ensure fixed ordering and codes
+    d <- commodities_ref %>%
+      left_join(d_raw %>% select(-!!rlang::sym("section_color")), by = c("section_code", "section_name", "commodity_code_short")) %>%
+      filter(!is.na(!!rlang::sym("trade_value")) & !!rlang::sym("trade_value") > 0) %>%
+      mutate(trade_value = as.numeric(!!rlang::sym("trade_value")))
+
+    # compute section totals and pick top N sections (by trade_value)
+    top_sections <- d %>%
+      group_by(!!sym("section_code"), !!sym("section_name")) %>%
+      summarise(section_total = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop") %>%
+      arrange(desc(!!sym("section_total"))) %>%
+      slice_head(n = 10) %>%
+      pull(!!sym("section_code"))
+
+    # lump small sections into Other products and reaggregate, assign stable code 'other'
+    d <- d %>%
+      mutate(section_code = ifelse(!!sym("section_code") %in% top_sections, !!sym("section_code"), "other"),
+             section_name = ifelse(section_code == "other", "Other products", section_name),
+             section_color = ifelse(section_code == "other", "#434348", section_color)) %>%
+      group_by(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short"), !!sym("commodity_name")) %>%
+      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop")
+
+    # Build ordered d2 including Other products so colors are canonical and ordered
+    d2 <- commodities_ref %>%
+      select(!!sym("section_code"), !!sym("section_name"), !!sym("section_color")) %>%
+      distinct() %>%
+      bind_rows(tibble(section_code = "other", section_name = "Other products", section_color = "#434348")) %>%
+      distinct(section_code, section_name, section_color)
 
     p_to_highcharts(d, d2)
   }) %>%
@@ -579,13 +603,41 @@ app_server <- function(input, output, session) {
   })
 
   exp_tm_dtl_max_yr <- reactive({
-    d <- df_dtl() %>%
+    commodities_ref <- tbl(con, "commodities") %>%
+      distinct(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short")) %>%
+      collect()
+
+    d_raw <- df_dtl() %>%
       filter(!!sym("year") == max(inp_y())) %>%
-      p_aggregate_by_section(col = "trade_value_usd_exp", con = con)
+      p_aggregate_by_section(col = "trade_value_usd_exp", con = con) %>%
+      filter(!!sym("trade_value") > 0) %>%
+      group_by(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short"), !!sym("commodity_name")) %>%
+      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop")
 
-    d2 <- p_colors(d, con = con)
+    d <- commodities_ref %>%
+      left_join(d_raw %>% select(-!!rlang::sym("section_color")), by = c("section_code", "section_name", "commodity_code_short")) %>%
+      filter(!is.na(!!rlang::sym("trade_value")) & !!rlang::sym("trade_value") > 0) %>%
+      mutate(trade_value = as.numeric(!!rlang::sym("trade_value")))
 
-    wt$inc(1)
+    top_sections <- d %>%
+      group_by(!!sym("section_code"), !!sym("section_name")) %>%
+      summarise(section_total = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop") %>%
+      arrange(desc(!!sym("section_total"))) %>%
+      slice_head(n = 10) %>%
+      pull(!!sym("section_code"))
+
+    d <- d %>%
+      mutate(section_code = ifelse(!!sym("section_code") %in% top_sections, !!sym("section_code"), "other"),
+             section_name = ifelse(section_code == "other", "Other products", section_name),
+             section_color = ifelse(section_code == "other", "#434348", section_color)) %>%
+      group_by(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short"), !!sym("commodity_name")) %>%
+      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop")
+
+    d2 <- commodities_ref %>%
+      select(!!sym("section_code"), !!sym("section_name"), !!sym("section_color")) %>%
+      distinct() %>%
+      bind_rows(tibble(section_code = "other", section_name = "Other products", section_color = "#434348")) %>%
+      distinct(section_code, section_name, section_color)
 
     p_to_highcharts(d, d2)
   }) %>%
@@ -611,8 +663,8 @@ app_server <- function(input, output, session) {
     d <- df_dtl() %>%
       filter(!!sym("year") == min(inp_y())) %>%
       p_aggregate_by_section(col = "trade_value_usd_imp", con = con) %>%
-      group_by(!!sym("section_name")) %>%
-      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE)) %>%
+      group_by(!!sym("section_name"), !!sym("section_color")) %>%
+      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop") %>%
       mutate(year = min(inp_y())) %>%
       filter(!!sym("trade_value") > 0) %>%
       mutate(section_name = fct_lump_n(
@@ -621,15 +673,19 @@ app_server <- function(input, output, session) {
         w = !!sym("trade_value"),
         other_level = "Other products"
       )) %>%
-      group_by(!!sym("year"), !!sym("section_name")) %>%
-      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE)) %>%
-      ungroup() %>%
+      # Assign neutral color to "Other products"
+      mutate(section_color = case_when(
+        as.character(!!sym("section_name")) == "Other products" ~ "#434348",
+        TRUE ~ !!sym("section_color")
+      )) %>%
+      group_by(!!sym("year"), !!sym("section_name"), !!sym("section_color")) %>%
+      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop") %>%
       bind_rows(
         df_dtl() %>%
           filter(!!sym("year") == max(inp_y())) %>%
           p_aggregate_by_section(col = "trade_value_usd_imp", con = con) %>%
-          group_by(!!sym("section_name")) %>%
-          summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE)) %>%
+          group_by(!!sym("section_name"), !!sym("section_color")) %>%
+          summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop") %>%
           mutate(year = max(inp_y())) %>%
           filter(!!sym("trade_value") > 0) %>%
           mutate(section_name = fct_lump_n(
@@ -638,26 +694,20 @@ app_server <- function(input, output, session) {
             w = !!sym("trade_value"),
             other_level = "Other products"
           )) %>%
-          group_by(!!sym("year"), !!sym("section_name")) %>%
-          summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE)) %>%
-          ungroup()
+          # Assign neutral color to "Other products"
+          mutate(section_color = case_when(
+            as.character(!!sym("section_name")) == "Other products" ~ "#434348",
+            TRUE ~ !!sym("section_color")
+          )) %>%
+          group_by(!!sym("year"), !!sym("section_name"), !!sym("section_color")) %>%
+          summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop")
       )
 
-    d <- d %>%
-      left_join(
-        p_colors(d, con = con)
-      ) %>%
-      mutate(
-        section_color = case_when(
-          is.na(!!sym("section_color")) ~ "#434348",
-          TRUE ~ !!sym("section_color")
-        )
-      )
-
-    d <- d %>%
-      mutate(section_name = ifelse(nchar(section_name) <= 30, section_name,
-        paste0(sub("^(\\S*\\s+\\S+\\S*\\s+\\S+\\S*\\s+\\S+\\S*\\s+\\S+).*", "\\1", section_name), "...")
-      ))
+    # d <- d %>%
+    #   mutate(section_name = as.character(section_name)) %>%
+    #   mutate(section_name = ifelse(nchar(section_name) <= 30, section_name,
+    #     paste0(sub("^(\\S*\\s+\\S+\\S*\\s+\\S+\\S*\\s+\\S+\\S*\\s+\\S+).*", "\\1", section_name), "...")
+    #   ))
 
     hchart(d,
       "column",
@@ -683,11 +733,41 @@ app_server <- function(input, output, session) {
     bindEvent(input$go)
 
   imp_tm_dtl_min_yr <- reactive({
-    d <- df_dtl() %>%
-      filter(!!sym("year") == min(inp_y())) %>%
-      p_aggregate_by_section(col = "trade_value_usd_imp", con = con)
+    commodities_ref <- tbl(con, "commodities") %>%
+      distinct(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short")) %>%
+      collect()
 
-    d2 <- p_colors(d, con = con)
+    d_raw <- df_dtl() %>%
+      filter(!!sym("year") == min(inp_y())) %>%
+      p_aggregate_by_section(col = "trade_value_usd_imp", con = con) %>%
+      filter(!!sym("trade_value") > 0) %>%
+      group_by(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short"), !!sym("commodity_name")) %>%
+      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop")
+
+    d <- commodities_ref %>%
+      left_join(d_raw, by = c("section_code", "section_name", "commodity_code_short")) %>%
+      filter(!is.na(!!rlang::sym("trade_value")) & !!rlang::sym("trade_value") > 0) %>%
+      mutate(trade_value = as.numeric(!!rlang::sym("trade_value")))
+
+    top_sections <- d %>%
+      group_by(!!sym("section_code"), !!sym("section_name")) %>%
+      summarise(section_total = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop") %>%
+      arrange(desc(!!sym("section_total"))) %>%
+      slice_head(n = 10) %>%
+      pull(!!sym("section_code"))
+
+    d <- d %>%
+      mutate(section_code = ifelse(!!sym("section_code") %in% top_sections, !!sym("section_code"), "other"),
+             section_name = ifelse(section_code == "other", "Other products", section_name),
+             section_color = ifelse(section_code == "other", "#434348", section_color)) %>%
+      group_by(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short"), !!sym("commodity_name")) %>%
+      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop")
+
+    d2 <- commodities_ref %>%
+      select(!!sym("section_code"), !!sym("section_name"), !!sym("section_color")) %>%
+      distinct() %>%
+      bind_rows(tibble(section_code = "other", section_name = "Other products", section_color = "#434348")) %>%
+      distinct(section_code, section_name, section_color)
 
     p_to_highcharts(d, d2)
   }) %>%
@@ -699,11 +779,41 @@ app_server <- function(input, output, session) {
   })
 
   imp_tm_dtl_max_yr <- reactive({
-    d <- df_dtl() %>%
-      filter(!!sym("year") == max(inp_y())) %>%
-      p_aggregate_by_section(col = "trade_value_usd_imp", con = con)
+    commodities_ref <- tbl(con, "commodities") %>%
+      distinct(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short")) %>%
+      collect()
 
-    d2 <- p_colors(d, con = con)
+    d_raw <- df_dtl() %>%
+      filter(!!sym("year") == max(inp_y())) %>%
+      p_aggregate_by_section(col = "trade_value_usd_imp", con = con) %>%
+      filter(!!sym("trade_value") > 0) %>%
+      group_by(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short"), !!sym("commodity_name")) %>%
+      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop")
+
+    d <- commodities_ref %>%
+      left_join(d_raw, by = c("section_code", "section_name", "commodity_code_short")) %>%
+      filter(!is.na(!!rlang::sym("trade_value")) & !!rlang::sym("trade_value") > 0) %>%
+      mutate(trade_value = as.numeric(!!rlang::sym("trade_value")))
+
+    top_sections <- d %>%
+      group_by(!!sym("section_code"), !!sym("section_name")) %>%
+      summarise(section_total = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop") %>%
+      arrange(desc(!!sym("section_total"))) %>%
+      slice_head(n = 10) %>%
+      pull(!!sym("section_code"))
+
+    d <- d %>%
+      mutate(section_code = ifelse(!!sym("section_code") %in% top_sections, !!sym("section_code"), "other"),
+             section_name = ifelse(section_code == "other", "Other products", section_name),
+             section_color = ifelse(section_code == "other", "#434348", section_color)) %>%
+      group_by(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short"), !!sym("commodity_name")) %>%
+      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop")
+
+    d2 <- commodities_ref %>%
+      select(!!sym("section_code"), !!sym("section_name"), !!sym("section_color")) %>%
+      distinct() %>%
+      bind_rows(tibble(section_code = "other", section_name = "Other products", section_color = "#434348")) %>%
+      distinct(section_code, section_name, section_color)
 
     wt$inc(3)
 
@@ -730,7 +840,7 @@ app_server <- function(input, output, session) {
       choices = sort(available_reporters_iso()[
         available_reporters_iso() != input$r
       ]),
-      selected = "all",
+      selected = "ALL",
       server = TRUE
     )
   })

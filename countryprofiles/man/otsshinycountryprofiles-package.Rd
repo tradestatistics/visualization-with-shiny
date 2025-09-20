@@ -4,9 +4,9 @@
 \name{otsshinycountryprofiles-package}
 \alias{otsshinycountryprofiles}
 \alias{otsshinycountryprofiles-package}
-\title{otsshinycountryprofiles: Open Trade Statistics Model App}
+\title{otsshinycountryprofiles: Open Trade Statistics Country App}
 \description{
-Wrappers around gravity models for interactive model building. This is meant as a production grade Shiny app and not as end user app.
+Production grade Shiny app to display the country profiles for tradestatistics.io.
 }
 \seealso{
 Useful links:
@@ -17,7 +17,7 @@ Useful links:
 
 }
 \author{
-\strong{Maintainer}: Mauricio Vargas \email{mavargas11@uc.cl}
+\strong{Maintainer}: Mauricio Vargas \email{m.vargas.sepulveda@gmail.com}
 
 }
 \keyword{internal}

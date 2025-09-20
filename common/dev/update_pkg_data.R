@@ -16,7 +16,7 @@ con <- dbConnect(
 # reporters ----
 
 reporters_display <- tbl(con, "countries") %>%
-  select(!!sym("country_iso"), !!sym("country_name_english")) %>%
+  select(!!sym("country_iso"), !!sym("country_name")) %>%
   collect()
 
 reporters_out <- reporters_display %>%
@@ -24,7 +24,7 @@ reporters_out <- reporters_display %>%
   pull()
 
 reporters_names_out <- reporters_display %>%
-  select(!!sym("country_name_english")) %>%
+  select(!!sym("country_name")) %>%
   pull()
 
 names(reporters_out) <- reporters_names_out
@@ -33,15 +33,15 @@ reporters_display <- reporters_out
 
 # sections ----
 
-sections_display <- tbl(con, "sections") %>%
+sections_display <- tbl(con, "commodities") %>%
   collect()
 
 sections_out <- sections_display %>%
-  select(!!sym("section_code")) %>%
+  distinct(!!sym("section_code")) %>%
   pull()
 
 sections_names_out <- sections_display %>%
-  select(!!sym("section_fullname_english")) %>%
+  distinct(!!sym("section_name")) %>%
   pull()
 
 names(sections_out) <- glue("{ sections_out } - { sections_names_out }")
@@ -51,7 +51,7 @@ sections_display <- sections_out
 # commodities short ----
 
 commodities_short_display <- tbl(con, "commodities_short") %>%
-  select(commodity_code, commodity_fullname_english) %>%
+  select(commodity_code, commodity_name) %>%
   collect()
 
 commodities_short_out <- commodities_short_display %>%
@@ -59,7 +59,7 @@ commodities_short_out <- commodities_short_display %>%
   pull()
 
 commodities_short_names_out <- commodities_short_display %>%
-  select(!!sym("commodity_fullname_english")) %>%
+  select(!!sym("commodity_name")) %>%
   pull()
 
 names(commodities_short_out) <- glue("{ commodities_short_out } - { commodities_short_names_out }")
@@ -73,7 +73,7 @@ commodities <- tbl(con, "commodities") %>%
   collect()
 
 commodities_display <- tbl(con, "commodities") %>%
-  select(commodity_code, commodity_fullname_english) %>%
+  select(commodity_code, commodity_name) %>%
   collect()
 
 commodities_out <- commodities_display %>%
@@ -81,7 +81,7 @@ commodities_out <- commodities_display %>%
   pull()
 
 commodities_names_out <- commodities_display %>%
-  select(!!sym("commodity_fullname_english")) %>%
+  select(!!sym("commodity_name")) %>%
   pull()
 
 names(commodities_out) <- glue("{ commodities_out } - { commodities_names_out }")

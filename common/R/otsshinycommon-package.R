@@ -21,7 +21,7 @@ NULL
 
 #' commodities
 #'
-#' Internal dataset for commodity codes (5,304 codes).
+#' Internal dataset for commodity codes (6,898 codes).
 #'
 #' @docType data
 #' @keywords datasets
@@ -30,7 +30,7 @@ NULL
 
 #' commodities_display
 #'
-#' Internal dataset for commodity codes (5,304 codes).
+#' Internal dataset for commodity codes (6,898 codes).
 #'
 #' @docType data
 #' @keywords datasets
@@ -39,7 +39,7 @@ NULL
 
 #' commodities_short_display
 #'
-#' Internal dataset for commodity codes (1,225 codes).
+#' Internal dataset for commodity codes (1,363 codes).
 #'
 #' @docType data
 #' @keywords datasets

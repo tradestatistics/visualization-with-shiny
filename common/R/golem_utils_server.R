@@ -20,133 +20,6 @@ sql_con <- function() {
   return(con)
 }
 
-#' Convert dollars from year X to year Y
-#' @param d input dataset
-#' @param reference_year year to convert dollars
-#' @param con SQL connection
-#' @importFrom dplyr distinct last pull tibble
-#' @importFrom purrr map_df
-#' @importFrom rlang sym
-#' @export
-gdp_deflator_adjustment <- function(d, reference_year, con) {
-  years <- d %>%
-    distinct(!!sym("year")) %>%
-    pull()
-
-  dd <- map_df(
-    years,
-    function(year) {
-      if (year < reference_year) {
-        tbl(con, "gdp_deflator") %>%
-          filter(!!sym("year_to") <= reference_year &
-            !!sym("year_to") > !!sym("year_from") &
-            !!sym("country_iso") == "all") %>%
-          collect() %>%
-          summarise(gdp_deflator = last(cumprod(!!sym("gdp_deflator")))) %>%
-          mutate(year = year, conversion_year = reference_year)
-      } else if (year > reference_year) {
-        tbl(con, "gdp_deflator") %>%
-          filter(!!sym("year_from") >= reference_year &
-            !!sym("year_to") > !!sym("year_from") &
-            !!sym("country_iso") == "all") %>%
-          collect() %>%
-          summarise(gdp_deflator = 1 / last(cumprod(!!sym("gdp_deflator")))) %>%
-          mutate(year = year, conversion_year = reference_year)
-      } else if (year == reference_year) {
-        tibble(
-          year = year, conversion_year = year, gdp_deflator = 1
-        )
-      }
-    }
-  )
-
-  d <- d %>%
-    left_join(dd, by = "year") %>%
-    mutate(
-      trade_value_usd_imp = round(!!sym("trade_value_usd_imp") * !!sym("gdp_deflator"), 0),
-      trade_value_usd_exp = round(!!sym("trade_value_usd_exp") * !!sym("gdp_deflator"), 0)
-    )
-
-  return(d)
-}
-
-#' Convert dollars from year X to year Y
-#' @param d input dataset
-#' @param reference_year year to convert dollars
-#' @param con SQL connection
-#' @importFrom dplyr distinct last tibble
-#' @importFrom purrr map_df
-#' @export
-gdp_deflator_adjustment_model <- function(d, reference_year, con) {
-  # Filter year conversion rates and join data ------------------------------
-  years <- d %>%
-    distinct(!!sym("year")) %>%
-    pull()
-
-  dd <- map_df(
-    years,
-    function(year) {
-      if (year < reference_year) {
-        tbl(con, "gdp_deflator") %>%
-          filter(!!sym("year_to") <= reference_year &
-            !!sym("year_to") > year &
-            !!sym("country_iso") == "all") %>%
-          collect() %>%
-          summarise(gdp_deflator = last(cumprod(!!sym("gdp_deflator")))) %>%
-          mutate(year = year, conversion_year = reference_year)
-      } else if (year > reference_year) {
-        tbl(con, "gdp_deflator") %>%
-          filter(!!sym("year_from") >= reference_year &
-            !!sym("year_from") < year &
-            !!sym("country_iso") == "all") %>%
-          collect() %>%
-          summarise(gdp_deflator = 1 / last(cumprod(!!sym("gdp_deflator")))) %>%
-          mutate(year = year, conversion_year = reference_year)
-      } else if (year == reference_year) {
-        tibble(
-          year = year, conversion_year = year, gdp_deflator = 1
-        )
-      }
-    }
-  )
-
-  d <- d %>%
-    left_join(dd, by = "year") %>%
-    mutate(
-      trade = round(!!sym("trade") * !!sym("gdp_deflator"), 0)
-    )
-
-  if (any(colnames(d) %in% c("gdp_exporter"))) {
-    d <- d %>%
-      mutate(
-        gdp_exporter = round(!!sym("gdp_exporter") * !!sym("gdp_deflator"), 0)
-      )
-  }
-
-  if (any(colnames(d) %in% c("gdp_exporter_percap"))) {
-    d <- d %>%
-      mutate(
-        gdp_exporter_percap = round(!!sym("gdp_exporter_percap") * !!sym("gdp_deflator"), 0)
-      )
-  }
-
-  if (any(colnames(d) %in% c("gdp_importer"))) {
-    d <- d %>%
-      mutate(
-        gdp_importer = round(!!sym("gdp_importer") * !!sym("gdp_deflator"), 0)
-      )
-  }
-
-  if (any(colnames(d) %in% c("gdp_importer_percap"))) {
-    d <- d %>%
-      mutate(
-        gdp_importer_percap = round(!!sym("gdp_importer_percap") * !!sym("gdp_deflator"), 0)
-      )
-  }
-
-  return(d)
-}
-
 # ORIGIN/DESTINATION TREEMAPS -----
 
 lvl_opts <- list(
@@ -180,6 +53,7 @@ lvl_opts <- list(
   )
 )
 
+  
 #' Custom Tooltip (For Highcharter Visuals)
 #' @importFrom highcharter JS
 #' @export
@@ -203,91 +77,6 @@ custom_tooltip_short <- function() {
 #' @export
 data_labels <- function() {
   JS("function() { return this.key + '<br>' + Math.round(this.point.value / this.point.series.tree.val * 10000 ) / 100 + '%'}")
-}
-
-#' Origin-Destination Order and Add Continent (For Highcharter Visuals)
-#' @param d input dataset
-#' @param col column to collapse
-#' @param con SQL connection
-#' @importFrom dplyr case_when collect filter group_by mutate select
-#'     summarise tbl ungroup
-#' @export
-od_order_and_add_continent <- function(d, col = "trade_value_usd_exp", con) {
-  d <- d %>%
-    select(country_iso = !!sym("reporter_iso"), trade_value = !!sym(col))
-
-  d <- d %>%
-    inner_join(
-      tbl(con, "countries") %>%
-        select(!!sym("country_iso"),
-          country_name = !!sym("country_name_english"),
-          continent_name = !!sym("continent_name_english")
-        ) %>%
-        collect() %>%
-        filter(!!sym("country_iso") != "all")
-    ) %>%
-    mutate(
-      continent_name = case_when(
-        is.na(!!sym("continent_name")) ~ !!sym("country_name"),
-        TRUE ~ !!sym("continent_name")
-      )
-    ) %>%
-    group_by(!!sym("country_iso"), !!sym("country_name"), !!sym("continent_name")) %>%
-    summarise(trade_value = sum(!!sym("trade_value"), na.rm = T)) %>%
-    ungroup() %>%
-    select(-!!sym("country_iso"))
-
-  d <- d %>%
-    select(!!sym("continent_name"), !!sym("country_name"), !!sym("trade_value")) %>%
-    group_by(!!sym("continent_name")) %>%
-    mutate(sum_trade_value = sum(!!sym("trade_value"), na.rm = T)) %>%
-    ungroup() %>%
-    arrange(-!!sym("sum_trade_value")) %>%
-    select(-!!sym("sum_trade_value"))
-
-  d <- map_df(
-    d %>%
-      select(!!sym("continent_name")) %>%
-      distinct() %>%
-      pull(),
-    function(c) {
-      d %>%
-        filter(!!sym("continent_name") == c) %>%
-        arrange(-!!sym("trade_value"))
-    }
-  )
-
-  return(d)
-}
-
-#' Origin-Destination Colours (For Highcharter Visuals)
-#' @param d input dataset
-#' @param con SQL connection
-#' @importFrom dplyr collect distinct filter left_join mutate select tbl
-#' @export
-od_colors <- function(d, con) {
-  d %>%
-    select(!!sym("continent_name")) %>%
-    distinct() %>%
-    inner_join(
-      tbl(con, "countries") %>%
-        select(!!sym("country_iso"),
-          continent_name = !!sym("continent_name_english"),
-          !!sym("country_name_english")
-        ) %>%
-        collect() %>%
-        filter(grepl("c-|e-536|e-837|e-838|e-839|e-899", !!sym("country_iso"))) %>%
-        mutate(continent_name = ifelse(is.na(!!sym("continent_name")),
-          !!sym("country_name_english"), !!sym("continent_name")
-        )) %>%
-        select(-!!sym("country_name_english")) %>%
-        left_join(
-          tbl(con, "countries_colors") %>%
-            select(!!("country_iso"), !!("country_color")) %>%
-            collect()
-        )
-    ) %>%
-    select(-!!sym("country_iso"))
 }
 
 #' Origin-Destination to Highcharter (For Highcharter Visuals)
@@ -331,12 +120,8 @@ od_to_highcharts <- function(d, d2) {
     levelIsConstant = FALSE,
     allowDrillToNode = TRUE,
     levels = lvl_opts,
-    tooltip = list(
-      pointFormatter = custom_tooltip()
-    ),
-    dataLabels = list(
-      formatter = data_labels()
-    )
+    tooltip = list(pointFormatter = custom_tooltip()),
+    dataLabels = list(formatter = data_labels())
   )
 }
 
@@ -346,25 +131,25 @@ od_to_highcharts <- function(d, d2) {
 #' @param d input dataset
 #' @param col column to collapse
 #' @param con SQL connection
-#' @importFrom dplyr arrange distinct filter group_by mutate pull rename
+#' @importFrom dplyr arrange distinct filter group_by mutate pull
 #'     select summarise ungroup
 #' @importFrom purrr map_df
 #' @export
 p_aggregate_by_section <- function(d, col, con) {
   d <- d %>%
-    select(!!sym("commodity_code"), !!sym("section_code"), !!sym(col)) %>%
-    rename(trade_value = !!sym(col))
+    select(!!sym("commodity_code"), !!sym("section_code"), !!sym("section_color"), trade_value = !!sym(col))
 
   d <- p_aggregate_products(d, con = con)
 
   d <- d %>%
-    group_by(!!sym("section_name"), !!sym("commodity_name")) %>%
+    # ensure we preserve commodity_code_short when available via p_aggregate_products
+    group_by(!!sym("section_code"), !!sym("section_color"), !!sym("section_name"), !!sym("commodity_code"), !!sym("commodity_code_short"), !!sym("commodity_name")) %>%
     summarise(trade_value = sum(!!sym("trade_value"), na.rm = T)) %>%
     ungroup()
 
   d <- d %>%
-    select(!!sym("section_name"), !!sym("commodity_name"), !!sym("trade_value")) %>%
-    group_by(!!sym("section_name")) %>%
+    select(!!sym("section_code"), !!sym("section_color"), !!sym("section_name"), !!sym("commodity_code"), !!sym("commodity_code_short"), !!sym("commodity_name"), !!sym("trade_value")) %>%
+    group_by(!!sym("section_code"), !!sym("section_color"), !!sym("section_name")) %>%
     mutate(sum_trade_value = sum(!!sym("trade_value"), na.rm = T)) %>%
     ungroup() %>%
     arrange(-!!sym("sum_trade_value")) %>%
@@ -372,12 +157,12 @@ p_aggregate_by_section <- function(d, col, con) {
 
   d <- map_df(
     d %>%
-      select(!!sym("section_name")) %>%
+      select(!!sym("section_code")) %>%
       distinct() %>%
       pull(),
     function(s) {
       d %>%
-        filter(!!sym("section_name") == s) %>%
+        filter(!!sym("section_code") == s) %>%
         arrange(-!!sym("trade_value"))
     }
   )
@@ -395,89 +180,206 @@ p_aggregate_products <- function(d, con) {
   d %>%
     inner_join(
       tbl(con, "commodities") %>%
-        select(
-          !!sym("commodity_code"),
-          !!sym("section_code")
-        ) %>%
-        filter(nchar(!!sym("commodity_code")) == 6) %>%
-        inner_join(
-          tbl(con, "sections") %>%
-            select(
-              !!sym("section_code"),
-              section_name = !!sym("section_fullname_english")
-            )
-        ) %>%
+        select(!!sym("commodity_code"), !!sym("commodity_code_short"), !!sym("section_code"),
+          !!sym("section_color"), !!sym("section_name")) %>%
         collect()
     ) %>%
-    mutate(commodity_code = substr(!!sym("commodity_code"), 1, 4)) %>%
     group_by(
-      !!sym("commodity_code"), !!sym("section_code"),
-      !!sym("section_name")
+      !!sym("commodity_code"), !!sym("commodity_code_short"), !!sym("section_code"), 
+      !!sym("section_color"), !!sym("section_name")
     ) %>%
     summarise(trade_value = sum(!!sym("trade_value"), na.rm = T)) %>%
     ungroup() %>%
     left_join(
       tbl(con, "commodities_short") %>%
         select(!!sym("commodity_code"),
-          commodity_name = !!sym("commodity_fullname_english")
+          commodity_name = !!sym("commodity_name")
         ) %>%
-        collect()
-    )
-}
-
-#' Colorize Products (For Highcharter Visuals)
-#' @param d input dataset
-#' @param con SQL connection
-#' @importFrom dplyr collect distinct inner_join select tbl
-#' @export
-p_colors <- function(d, con) {
-  d %>%
-    select(!!sym("section_name")) %>%
-    distinct() %>%
-    inner_join(
-      tbl(con, "sections") %>%
-        select(
-          !!sym("section_code"),
-          section_name = !!sym("section_fullname_english")
-        ) %>%
-        inner_join(
-          tbl(con, "sections_colors")
-        ) %>%
-        collect() %>%
-        select(-!!sym("section_code"))
+        collect(),
+      by = c("commodity_code_short" = "commodity_code")
     )
 }
 
 #' Product to Highcharter (For Highcharter Visuals)
 #' @param d input dataset for values
-#' @param d2 input dataset for colours
-#' @importFrom dplyr collect distinct inner_join mutate_if select tbl
+#' @param d2 optional dataset for colours (when provided it will be used as the
+#' color reference so the same `section_name` maps to the same colour across
+#' different treemaps)
+#' @importFrom dplyr collect distinct inner_join mutate_if select tbl arrange pull slice
+#' @importFrom rlang sym
 #' @export
-p_to_highcharts <- function(d, d2) {
+p_to_highcharts <- function(d, d2 = NULL) {
+  # ensure section_name (and section_code if present) are character
   dd <- d %>%
-    mutate(section_name = factor(!!sym("section_name"), levels = d2$section_name)) %>%
-    arrange(!!sym("section_name"))
+    mutate(section_name = as.character(section_name))
+  if ("section_code" %in% names(dd)) dd <- dd %>% mutate(section_code = as.character(section_code))
 
-  new_lvls <- dd %>%
-    group_by(!!sym("section_name"), !!sym("commodity_name")) %>%
-    summarise(
-      trade_value = sum(!!sym("trade_value"), na.rm = TRUE),
-      .groups = "drop"
-    ) %>%
-    ungroup() %>%
-    mutate_if(is.factor, as.character) %>%
-    arrange(desc(!!sym("trade_value"))) %>%
-    distinct(!!sym("section_name")) %>%
-    pull(!!sym("section_name"))
+  # Build reference of sections and colours. Prefer section_code when available.
+  if (!is.null(d2)) {
+    if ("section_code" %in% names(d2)) {
+      ref <- d2 %>%
+        distinct(section_code, section_name, section_color) %>%
+        mutate(section_code = as.character(section_code), section_name = as.character(section_name))
+      use_code <- TRUE
+    } else {
+      ref <- d2 %>%
+        distinct(section_name, section_color) %>%
+        mutate(section_name = as.character(section_name))
+      use_code <- FALSE
+    }
+  } else {
+    if ("section_code" %in% names(dd)) {
+      ref <- dd %>%
+        distinct(section_code, section_name, section_color) %>%
+        mutate(section_code = as.character(section_code), section_name = as.character(section_name))
+      use_code <- TRUE
+    } else {
+      ref <- dd %>%
+        distinct(section_name, section_color) %>%
+        mutate(section_name = as.character(section_name))
+      use_code <- FALSE
+    }
+  }
 
-  new_colors <- d2 %>%
-    mutate(section_name = factor(!!sym("section_name"), levels = new_lvls)) %>%
-    arrange(!!sym("section_name")) %>%
-    pull(!!sym("section_color"))
+  # Create mapping helpers and derive ordered colors vector.
+  norm_func <- function(x) tolower(trimws(gsub("\\s+", " ", as.character(x))))
 
-  els <- data_to_hierarchical(dd, c("section_name", "commodity_name"), "trade_value",
-    colors = new_colors
-  )
+  # If a colour reference (d2) was provided prefer its order. Use section_code
+  # when available for exact matching; fall back to name-based ordering.
+  if (use_code) {
+    # preserve order of ref as provided in d2
+    ref <- ref %>% mutate(section_code = as.character(section_code))
+    code_color_map <- setNames(as.character(ref$section_color), as.character(ref$section_code))
+
+    # build section order as intersection of ref codes and observed dd codes
+    observed_codes <- unique(dd$section_code)
+    section_order <- ref$section_code[ref$section_code %in% observed_codes]
+
+    colors_for_dd <- if (length(section_order) > 0) {
+      unname(code_color_map[section_order])
+    } else {
+      character(0)
+    }
+  } else {
+    # name-based mapping: compute ordering by total trade (existing behaviour)
+    color_map <- setNames(as.character(ref$section_color), norm_func(ref$section_name))
+
+    section_levels <- dd %>%
+      group_by(!!sym("section_name")) %>%
+      summarise(total = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop") %>%
+      arrange(desc(!!sym("total"))) %>%
+      pull(!!sym("section_name"))
+
+    dd <- dd %>%
+      mutate(section_name = factor(!!sym("section_name"), levels = section_levels)) %>%
+      arrange(!!sym("section_name"))
+
+    section_order_df <- dd %>%
+      distinct(section_name, section_color) %>%
+      mutate(section_name = as.character(section_name)) %>%
+      slice(match(section_levels, section_name))
+
+    colors_for_dd <- if (nrow(section_order_df) > 0) section_order_df$section_color else character(0)
+  }
+
+  # If we have a stable section_code we can build an explicit flat id/parent
+  # treemap dataset (id, parent, name, value, color). This is deterministic
+  # and ensures colours come from `ref` (d2) in the requested order. If
+  # section_code is not available we fall back to the previous
+  # data_to_hierarchical + heuristic colour assignment.
+  if (use_code) {
+    # Summarise section totals and children (commodities)
+    sections_df <- dd %>%
+      group_by(!!sym("section_code"), !!sym("section_name"), !!sym("section_color")) %>%
+      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop")
+
+    # Respect the order from ref (d2) but keep only observed sections
+    section_order <- ref$section_code[ref$section_code %in% sections_df[["section_code"]]]
+    sections_df <- sections_df %>%
+      mutate(section_code = factor(!!sym("section_code"), levels = section_order)) %>%
+      arrange(!!sym("section_code")) %>%
+      mutate(section_code = as.character(!!sym("section_code")))
+
+    children_df <- dd %>%
+      group_by(!!sym("section_code"), !!sym("commodity_name")) %>%
+      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop")
+
+    # Build list-of-lists points for highcharter: top-level sections + children
+    section_points <- purrr::pmap(
+      list(sections_df[["section_code"]], sections_df[["section_name"]], sections_df[["trade_value"]], sections_df[["section_color"]]),
+      function(id, name, value, color) {
+        list(id = as.character(id), name = as.character(name), value = as.numeric(value), color = as.character(color))
+      }
+    )
+
+    child_points <- purrr::pmap(
+      list(children_df[["section_code"]], children_df[["commodity_name"]], children_df[["trade_value"]]),
+      function(parent, name, value) {
+        # use parent colour for children so they remain visually grouped
+        parent_col <- ref$section_color[match(parent, ref$section_code)]
+        list(id = paste0(as.character(parent), "__", as.character(name)), name = as.character(name), parent = as.character(parent), value = as.numeric(value), color = as.character(parent_col))
+      }
+    )
+
+    points <- c(section_points, child_points)
+
+    els <- list(series = list(list(data = points)))
+
+    # Temporary debug: save the inputs and constructed points to /tmp for
+    # inspection when running the app locally. This will help verify that
+    # colours and ids are constructed as expected.
+    try({
+      dbg <- list(d = dd, d2 = ref, sections = sections_df, children = children_df, points = points)
+      fn <- file.path("/tmp", paste0("p_to_highcharts_debug_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".rds"))
+      saveRDS(dbg, fn)
+    }, silent = TRUE)
+  } else {
+    # Build a temporary section key that embeds section_code when available. This
+    # lets us build hierarchical nodes keyed by stable code but still display
+    # human labels later.
+    dd <- dd %>% mutate(section_key = section_name)
+
+    # Build hierarchical via data_to_hierarchical using section_key so top-level
+    # nodes contain the code token we can parse out later.
+    els <- data_to_hierarchical(dd, c("section_key", "commodity_name"), "trade_value",
+      colors = colors_for_dd
+    )
+
+    assign_colors_to_nodes <- function(node) {
+      if (!is.list(node)) return(node)
+      if (!is.null(node$name)) {
+        n_raw <- as.character(node$name)
+        n <- norm_func(n_raw)
+        if (exists("color_map") && n %in% names(color_map)) {
+          node$color <- color_map[[n]]
+        } else {
+          matched <- NULL
+          if (exists("color_map")) {
+            for (k in names(color_map)) {
+              if (grepl(k, n, fixed = TRUE) || grepl(n, k, fixed = TRUE)) {
+                matched <- k
+                break
+              }
+            }
+          }
+          if (!is.null(matched)) node$color <- color_map[[matched]]
+        }
+      }
+
+      if (!is.null(node$data) && is.list(node$data)) node$data <- lapply(node$data, assign_colors_to_nodes)
+      if (!is.null(node$children) && is.list(node$children)) node$children <- lapply(node$children, assign_colors_to_nodes)
+      return(node)
+    }
+
+    if (!is.null(els$series) && is.list(els$series)) {
+      els$series <- lapply(els$series, function(s) {
+        if (!is.null(s$data) && is.list(s$data)) s$data <- lapply(s$data, assign_colors_to_nodes) else s <- assign_colors_to_nodes(s)
+        s
+      })
+    } else {
+      els <- assign_colors_to_nodes(els)
+    }
+  }
 
   lopts <- getOption("highcharter.lang")
   lopts$thousandsSep <- ","
@@ -498,19 +400,35 @@ p_to_highcharts <- function(d, d2) {
   )
 }
 
-# MODELS ----
-
-#' Custom error for models
-#' @importFrom fixest feols
+# Small grammar helpers used by glue templates in the app_server
+# These used to live in the app namespace; define safe fallbacks here so
+# glues don't fail when the functions are referenced during rendering.
 #' @export
-custom_regression_error <- function() {
-  feols(ERROR ~ UNFEASIBLE + ESTIMATION,
-    data = data.frame(
-      ERROR = c(1, 0, 0),
-      UNFEASIBLE = c(0, 1, 0),
-      ESTIMATION = c(0, 0, 1)
-    )
-  )
+r_add_the <- function(name = NULL) {
+  # Return 'the' for reporter names that typically take the article
+  if (is.null(name)) return("")
+  if (substr(name, 1, 6) == "United" || substr(name, 1, 3) == "USA" || substr(name, 1, 7) == "Russian") {
+    return("the")
+  }
+  ""
+}
+
+#' @export
+r_add_upp_the <- function(name = NULL) {
+  v <- r_add_the(name)
+  if (nchar(v) == 0) return("")
+  # Capitalize only the first letter ("The") rather than returning all caps
+  paste0(toupper(substr(v, 1, 1)), tolower(substr(v, 2, nchar(v))))
+}
+
+#' @export
+p_add_the <- function(name = NULL) {
+  # same logic for partner names
+  if (is.null(name)) return("")
+  if (substr(name, 1, 6) == "United" || substr(name, 1, 3) == "USA" || substr(name, 1, 7) == "Russian") {
+    return("the")
+  }
+  ""
 }
 
 # FORMAT TEXTS ----
