@@ -589,9 +589,19 @@ app_server <- function(input, output, session) {
       ) %>%
       select(year, section_code = section_code_mapped, section_name = section_name_final, section_color = section_color_final, trade, exchange) %>%
       mutate(year = as.character(year)) %>%
-      arrange(year, desc(exchange)) %>%
-      # ensure plotting order: factor section_name with 'Other products' last
-      mutate(section_name = factor(as.character(section_name), levels = c(setdiff(cs$section_name, "Other products"), "Other products")))
+      # Create factor levels with "Other products" last, preserving value-based order for others
+      mutate(
+        section_name_factor = factor(
+          as.character(section_name), 
+          levels = c(
+            setdiff(unique(arrange(., desc(exchange))$section_name), "Other products"),
+            "Other products"
+          )
+        )
+      ) %>%
+      arrange(year, section_name_factor) %>%
+      mutate(section_name = section_name_factor) %>%
+      select(-section_name_factor)
 
     hchart(d,
       "column",
@@ -723,9 +733,19 @@ app_server <- function(input, output, session) {
       ) %>%
       select(year, section_code = section_code_mapped, section_name = section_name_final, section_color = section_color_final, trade, trade_exchange) %>%
       mutate(year = as.character(year)) %>%
-      arrange(year, desc(trade_exchange)) %>%
-      # ensure plotting order: factor section_name with 'Other products' last
-      mutate(section_name = factor(as.character(section_name), levels = c(setdiff(cs$section_name, "Other products"), "Other products")))
+      # Create factor levels with "Other products" last, preserving value-based order for others
+      mutate(
+        section_name_factor = factor(
+          as.character(section_name), 
+          levels = c(
+            setdiff(unique(arrange(., desc(trade_exchange))$section_name), "Other products"),
+            "Other products"
+          )
+        )
+      ) %>%
+      arrange(year, section_name_factor) %>%
+      mutate(section_name = section_name_factor) %>%
+      select(-section_name_factor)
 
     hchart(d,
       "column",
