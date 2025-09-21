@@ -751,59 +751,93 @@ mod_countries_server <- function(id) {
 
     # Export column charts
     exp_col_min_yr_usd <- reactive({
-      # Get top 4 partners + "Rest of the world" for exports
       min_year <- min(inp_y())
       d <- tbl(con, tbl_dtl)
 
       if (inp_p() == "ALL") {
+        # Show top 4 partners + "Rest of the world" for multilateral trade
         d <- d %>%
           filter(
             !!sym("year") == !!min_year &
             !!sym("reporter_iso") == !!inp_r()
           )
+
+        d <- d %>% collect()
+
+        d <- d %>%
+          inner_join(
+            tbl(con, "countries") %>%
+              select(!!sym("country_iso"), !!sym("country_name")) %>%
+              collect(),
+            by = c("partner_iso" = "country_iso")
+          )
+
+        if (inp_d() != "No") {
+          d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
+        }
+
+        d <- d %>%
+          group_by(!!sym("country_name")) %>%
+          summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
+          filter(!!sym("trade_value_usd_exp") > 0) %>%
+          mutate(country_name = fct_lump_n(f = !!sym("country_name"), 
+                                           n = 4, 
+                                           w = !!sym("trade_value_usd_exp"),
+                                           other_level = "Rest of the world")) %>%
+          group_by(!!sym("country_name")) %>%
+          summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
+          mutate(country_name = factor(!!sym("country_name"), 
+                                       levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")))
+
+        hchart(d, "column", hcaes(x = "country_name", y = "trade_value_usd_exp"),
+               color = "#85cca6",
+               tooltip = list(pointFormat = "<b>{point.y:,.0f} USD</b>")) %>%
+          hc_xAxis(title = list(text = "Country")) %>%
+          hc_yAxis(title = list(text = "USD billion"),
+                   labels = list(formatter = JS("function() { return this.value / 1000000000 }"))) %>%
+          hc_title(text = exp_col_min_yr_usd_tt())
       } else {
+        # Show top 4 sections + "Other products" for bilateral trade
         d <- d %>%
           filter(
             !!sym("year") == !!min_year &
             !!sym("reporter_iso") == !!inp_r() &
             !!sym("partner_iso") == !!inp_p()
           )
+
+        d <- d %>%
+          inner_join(
+            tbl(con, "commodities") %>%
+              distinct(!!sym("commodity_code"), !!sym("section_code"), !!sym("section_name"), !!sym("section_color")),
+            by = c("commodity_code", "section_code")
+          ) %>%
+          collect()
+
+        if (inp_d() != "No") {
+          d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
+        }
+
+        d <- d %>%
+          group_by(!!sym("section_name")) %>%
+          summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
+          filter(!!sym("trade_value_usd_exp") > 0) %>%
+          mutate(section_name = fct_lump_n(f = !!sym("section_name"), 
+                                           n = 4, 
+                                           w = !!sym("trade_value_usd_exp"),
+                                           other_level = "Other products")) %>%
+          group_by(!!sym("section_name")) %>%
+          summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
+          mutate(section_name = factor(!!sym("section_name"), 
+                                       levels = c(setdiff(unique(!!sym("section_name")), "Other products"), "Other products")))
+
+        hchart(d, "column", hcaes(x = "section_name", y = "trade_value_usd_exp"),
+               color = "#85cca6",
+               tooltip = list(pointFormat = "<b>{point.y:,.0f} USD</b>")) %>%
+          hc_xAxis(title = list(text = "Product Section")) %>%
+          hc_yAxis(title = list(text = "USD billion"),
+                   labels = list(formatter = JS("function() { return this.value / 1000000000 }"))) %>%
+          hc_title(text = exp_col_min_yr_usd_tt())
       }
-
-      d <- d %>% collect()
-
-      d <- d %>%
-        inner_join(
-          tbl(con, "countries") %>%
-            select(!!sym("country_iso"), !!sym("country_name")) %>%
-            collect(),
-          by = c("partner_iso" = "country_iso")
-        )
-
-      if (inp_d() != "No") {
-        d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
-      }
-
-      d <- d %>%
-        group_by(!!sym("country_name")) %>%
-        summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
-        filter(!!sym("trade_value_usd_exp") > 0) %>%
-        mutate(country_name = fct_lump_n(f = !!sym("country_name"), 
-                                         n = 4, 
-                                         w = !!sym("trade_value_usd_exp"),
-                                         other_level = "Rest of the world")) %>%
-        group_by(!!sym("country_name")) %>%
-        summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
-        mutate(country_name = factor(!!sym("country_name"), 
-                                     levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")))
-
-      hchart(d, "column", hcaes(x = "country_name", y = "trade_value_usd_exp"),
-             color = "#85cca6",
-             tooltip = list(pointFormat = "<b>{point.y:,.0f} USD</b>")) %>%
-        hc_xAxis(title = list(text = "Country")) %>%
-        hc_yAxis(title = list(text = "USD billion"),
-                 labels = list(formatter = JS("function() { return this.value / 1000000000 }"))) %>%
-        hc_title(text = exp_col_min_yr_usd_tt())
     }) %>%
       bindCache(inp_y(), inp_r(), inp_p(), inp_d()) %>%
       bindEvent(input$go)
@@ -813,54 +847,89 @@ mod_countries_server <- function(id) {
       d <- tbl(con, tbl_dtl)
 
       if (inp_p() == "ALL") {
+        # Show top 4 partners + "Rest of the world" for multilateral trade
         d <- d %>%
           filter(
             !!sym("year") == !!min_year &
             !!sym("reporter_iso") == !!inp_r()
           )
+
+        d <- d %>% collect()
+
+        d <- d %>%
+          inner_join(
+            tbl(con, "countries") %>%
+              select(!!sym("country_iso"), !!sym("country_name")) %>%
+              collect(),
+            by = c("partner_iso" = "country_iso")
+          )
+
+        if (inp_d() != "No") {
+          d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
+        }
+
+        d <- d %>%
+          group_by(!!sym("country_name")) %>%
+          summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
+          filter(!!sym("trade_value_usd_exp") > 0) %>%
+          mutate(country_name = fct_lump_n(f = !!sym("country_name"), 
+                                           n = 4, 
+                                           w = !!sym("trade_value_usd_exp"),
+                                           other_level = "Rest of the world")) %>%
+          group_by(!!sym("country_name")) %>%
+          summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
+          mutate(percentage = round(100 * !!sym("trade_value_usd_exp") / sum(!!sym("trade_value_usd_exp")), 1)) %>%
+          mutate(country_name = factor(!!sym("country_name"), 
+                                       levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")))
+
+        hchart(d, "column", hcaes(x = "country_name", y = "percentage"),
+               color = "#85cca6",
+               tooltip = list(pointFormat = "<b>{point.y}%</b>")) %>%
+          hc_xAxis(title = list(text = "Country")) %>%
+          hc_yAxis(title = list(text = "Percentage (%)")) %>%
+          hc_title(text = exp_col_min_yr_pct_tt())
       } else {
+        # Show top 4 sections + "Other products" for bilateral trade
         d <- d %>%
           filter(
             !!sym("year") == !!min_year &
             !!sym("reporter_iso") == !!inp_r() &
             !!sym("partner_iso") == !!inp_p()
           )
+
+        d <- d %>%
+          inner_join(
+            tbl(con, "commodities") %>%
+              distinct(!!sym("commodity_code"), !!sym("section_code"), !!sym("section_name"), !!sym("section_color")),
+            by = c("commodity_code", "section_code")
+          ) %>%
+          collect()
+
+        if (inp_d() != "No") {
+          d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
+        }
+
+        d <- d %>%
+          group_by(!!sym("section_name")) %>%
+          summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
+          filter(!!sym("trade_value_usd_exp") > 0) %>%
+          mutate(section_name = fct_lump_n(f = !!sym("section_name"), 
+                                           n = 4, 
+                                           w = !!sym("trade_value_usd_exp"),
+                                           other_level = "Other products")) %>%
+          group_by(!!sym("section_name")) %>%
+          summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
+          mutate(percentage = round(100 * !!sym("trade_value_usd_exp") / sum(!!sym("trade_value_usd_exp")), 1)) %>%
+          mutate(section_name = factor(!!sym("section_name"), 
+                                       levels = c(setdiff(unique(!!sym("section_name")), "Other products"), "Other products")))
+
+        hchart(d, "column", hcaes(x = "section_name", y = "percentage"),
+               color = "#85cca6",
+               tooltip = list(pointFormat = "<b>{point.y}%</b>")) %>%
+          hc_xAxis(title = list(text = "Product Section")) %>%
+          hc_yAxis(title = list(text = "Percentage (%)")) %>%
+          hc_title(text = exp_col_min_yr_pct_tt())
       }
-
-      d <- d %>% collect()
-
-      d <- d %>%
-        inner_join(
-          tbl(con, "countries") %>%
-            select(!!sym("country_iso"), !!sym("country_name")) %>%
-            collect(),
-          by = c("partner_iso" = "country_iso")
-        )
-
-      if (inp_d() != "No") {
-        d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
-      }
-
-      d <- d %>%
-        group_by(!!sym("country_name")) %>%
-        summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
-        filter(!!sym("trade_value_usd_exp") > 0) %>%
-        mutate(country_name = fct_lump_n(f = !!sym("country_name"), 
-                                         n = 4, 
-                                         w = !!sym("trade_value_usd_exp"),
-                                         other_level = "Rest of the world")) %>%
-        group_by(!!sym("country_name")) %>%
-        summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
-        mutate(percentage = round(100 * !!sym("trade_value_usd_exp") / sum(!!sym("trade_value_usd_exp")), 1)) %>%
-        mutate(country_name = factor(!!sym("country_name"), 
-                                     levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")))
-
-      hchart(d, "column", hcaes(x = "country_name", y = "percentage"),
-             color = "#85cca6",
-             tooltip = list(pointFormat = "<b>{point.y}%</b>")) %>%
-        hc_xAxis(title = list(text = "Country")) %>%
-        hc_yAxis(title = list(text = "Percentage (%)")) %>%
-        hc_title(text = exp_col_min_yr_pct_tt())
     }) %>%
       bindCache(inp_y(), inp_r(), inp_p(), inp_d()) %>%
       bindEvent(input$go)
@@ -870,54 +939,89 @@ mod_countries_server <- function(id) {
       d <- tbl(con, tbl_dtl)
 
       if (inp_p() == "ALL") {
+        # Show top 4 partners + "Rest of the world" for multilateral trade
         d <- d %>%
           filter(
             !!sym("year") == !!max_year &
             !!sym("reporter_iso") == !!inp_r()
           )
+
+        d <- d %>% collect()
+
+        d <- d %>%
+          inner_join(
+            tbl(con, "countries") %>%
+              select(!!sym("country_iso"), !!sym("country_name")) %>%
+              collect(),
+            by = c("partner_iso" = "country_iso")
+          )
+
+        if (inp_d() != "No") {
+          d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
+        }
+
+        d <- d %>%
+          group_by(!!sym("country_name")) %>%
+          summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
+          filter(!!sym("trade_value_usd_exp") > 0) %>%
+          mutate(country_name = fct_lump_n(f = !!sym("country_name"), 
+                                           n = 4, 
+                                           w = !!sym("trade_value_usd_exp"),
+                                           other_level = "Rest of the world")) %>%
+          group_by(!!sym("country_name")) %>%
+          summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
+          mutate(country_name = factor(!!sym("country_name"), 
+                                       levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")))
+
+        hchart(d, "column", hcaes(x = "country_name", y = "trade_value_usd_exp"),
+               color = "#67c090",
+               tooltip = list(pointFormat = "<b>{point.y:,.0f} USD</b>")) %>%
+          hc_xAxis(title = list(text = "Country")) %>%
+          hc_yAxis(title = list(text = "USD billion"),
+                   labels = list(formatter = JS("function() { return this.value / 1000000000 }"))) %>%
+          hc_title(text = exp_col_max_yr_usd_tt())
       } else {
+        # Show top 4 sections + "Other products" for bilateral trade
         d <- d %>%
           filter(
             !!sym("year") == !!max_year &
             !!sym("reporter_iso") == !!inp_r() &
             !!sym("partner_iso") == !!inp_p()
           )
+
+        d <- d %>%
+          inner_join(
+            tbl(con, "commodities") %>%
+              distinct(!!sym("commodity_code"), !!sym("section_code"), !!sym("section_name"), !!sym("section_color")),
+            by = c("commodity_code", "section_code")
+          ) %>%
+          collect()
+
+        if (inp_d() != "No") {
+          d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
+        }
+
+        d <- d %>%
+          group_by(!!sym("section_name")) %>%
+          summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
+          filter(!!sym("trade_value_usd_exp") > 0) %>%
+          mutate(section_name = fct_lump_n(f = !!sym("section_name"), 
+                                           n = 4, 
+                                           w = !!sym("trade_value_usd_exp"),
+                                           other_level = "Other products")) %>%
+          group_by(!!sym("section_name")) %>%
+          summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
+          mutate(section_name = factor(!!sym("section_name"), 
+                                       levels = c(setdiff(unique(!!sym("section_name")), "Other products"), "Other products")))
+
+        hchart(d, "column", hcaes(x = "section_name", y = "trade_value_usd_exp"),
+               color = "#67c090",
+               tooltip = list(pointFormat = "<b>{point.y:,.0f} USD</b>")) %>%
+          hc_xAxis(title = list(text = "Product Section")) %>%
+          hc_yAxis(title = list(text = "USD billion"),
+                   labels = list(formatter = JS("function() { return this.value / 1000000000 }"))) %>%
+          hc_title(text = exp_col_max_yr_usd_tt())
       }
-
-      d <- d %>% collect()
-
-      d <- d %>%
-        inner_join(
-          tbl(con, "countries") %>%
-            select(!!sym("country_iso"), !!sym("country_name")) %>%
-            collect(),
-          by = c("partner_iso" = "country_iso")
-        )
-
-      if (inp_d() != "No") {
-        d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
-      }
-
-      d <- d %>%
-        group_by(!!sym("country_name")) %>%
-        summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
-        filter(!!sym("trade_value_usd_exp") > 0) %>%
-        mutate(country_name = fct_lump_n(f = !!sym("country_name"), 
-                                         n = 4, 
-                                         w = !!sym("trade_value_usd_exp"),
-                                         other_level = "Rest of the world")) %>%
-        group_by(!!sym("country_name")) %>%
-        summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
-        mutate(country_name = factor(!!sym("country_name"), 
-                                     levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")))
-
-      hchart(d, "column", hcaes(x = "country_name", y = "trade_value_usd_exp"),
-             color = "#67c090",
-             tooltip = list(pointFormat = "<b>{point.y:,.0f} USD</b>")) %>%
-        hc_xAxis(title = list(text = "Country")) %>%
-        hc_yAxis(title = list(text = "USD billion"),
-                 labels = list(formatter = JS("function() { return this.value / 1000000000 }"))) %>%
-        hc_title(text = exp_col_max_yr_usd_tt())
     }) %>%
       bindCache(inp_y(), inp_r(), inp_p(), inp_d()) %>%
       bindEvent(input$go)
@@ -927,54 +1031,89 @@ mod_countries_server <- function(id) {
       d <- tbl(con, tbl_dtl)
 
       if (inp_p() == "ALL") {
+        # Show top 4 partners + "Rest of the world" for multilateral trade
         d <- d %>%
           filter(
             !!sym("year") == !!max_year &
             !!sym("reporter_iso") == !!inp_r()
           )
+
+        d <- d %>% collect()
+
+        d <- d %>%
+          inner_join(
+            tbl(con, "countries") %>%
+              select(!!sym("country_iso"), !!sym("country_name")) %>%
+              collect(),
+            by = c("partner_iso" = "country_iso")
+          )
+
+        if (inp_d() != "No") {
+          d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
+        }
+
+        d <- d %>%
+          group_by(!!sym("country_name")) %>%
+          summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
+          filter(!!sym("trade_value_usd_exp") > 0) %>%
+          mutate(country_name = fct_lump_n(f = !!sym("country_name"), 
+                                           n = 4, 
+                                           w = !!sym("trade_value_usd_exp"),
+                                           other_level = "Rest of the world")) %>%
+          group_by(!!sym("country_name")) %>%
+          summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
+          mutate(percentage = round(100 * !!sym("trade_value_usd_exp") / sum(!!sym("trade_value_usd_exp")), 1)) %>%
+          mutate(country_name = factor(!!sym("country_name"), 
+                                       levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")))
+
+        hchart(d, "column", hcaes(x = "country_name", y = "percentage"),
+               color = "#67c090",
+               tooltip = list(pointFormat = "<b>{point.y}%</b>")) %>%
+          hc_xAxis(title = list(text = "Country")) %>%
+          hc_yAxis(title = list(text = "Percentage (%)")) %>%
+          hc_title(text = exp_col_max_yr_pct_tt())
       } else {
+        # Show top 4 sections + "Other products" for bilateral trade
         d <- d %>%
           filter(
             !!sym("year") == !!max_year &
             !!sym("reporter_iso") == !!inp_r() &
             !!sym("partner_iso") == !!inp_p()
           )
+
+        d <- d %>%
+          inner_join(
+            tbl(con, "commodities") %>%
+              distinct(!!sym("commodity_code"), !!sym("section_code"), !!sym("section_name"), !!sym("section_color")),
+            by = c("commodity_code", "section_code")
+          ) %>%
+          collect()
+
+        if (inp_d() != "No") {
+          d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
+        }
+
+        d <- d %>%
+          group_by(!!sym("section_name")) %>%
+          summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
+          filter(!!sym("trade_value_usd_exp") > 0) %>%
+          mutate(section_name = fct_lump_n(f = !!sym("section_name"), 
+                                           n = 4, 
+                                           w = !!sym("trade_value_usd_exp"),
+                                           other_level = "Other products")) %>%
+          group_by(!!sym("section_name")) %>%
+          summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
+          mutate(percentage = round(100 * !!sym("trade_value_usd_exp") / sum(!!sym("trade_value_usd_exp")), 1)) %>%
+          mutate(section_name = factor(!!sym("section_name"), 
+                                       levels = c(setdiff(unique(!!sym("section_name")), "Other products"), "Other products")))
+
+        hchart(d, "column", hcaes(x = "section_name", y = "percentage"),
+               color = "#67c090",
+               tooltip = list(pointFormat = "<b>{point.y}%</b>")) %>%
+          hc_xAxis(title = list(text = "Product Section")) %>%
+          hc_yAxis(title = list(text = "Percentage (%)")) %>%
+          hc_title(text = exp_col_max_yr_pct_tt())
       }
-
-      d <- d %>% collect()
-
-      d <- d %>%
-        inner_join(
-          tbl(con, "countries") %>%
-            select(!!sym("country_iso"), !!sym("country_name")) %>%
-            collect(),
-          by = c("partner_iso" = "country_iso")
-        )
-
-      if (inp_d() != "No") {
-        d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
-      }
-
-      d <- d %>%
-        group_by(!!sym("country_name")) %>%
-        summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
-        filter(!!sym("trade_value_usd_exp") > 0) %>%
-        mutate(country_name = fct_lump_n(f = !!sym("country_name"), 
-                                         n = 4, 
-                                         w = !!sym("trade_value_usd_exp"),
-                                         other_level = "Rest of the world")) %>%
-        group_by(!!sym("country_name")) %>%
-        summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
-        mutate(percentage = round(100 * !!sym("trade_value_usd_exp") / sum(!!sym("trade_value_usd_exp")), 1)) %>%
-        mutate(country_name = factor(!!sym("country_name"), 
-                                     levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")))
-
-      hchart(d, "column", hcaes(x = "country_name", y = "percentage"),
-             color = "#67c090",
-             tooltip = list(pointFormat = "<b>{point.y}%</b>")) %>%
-        hc_xAxis(title = list(text = "Country")) %>%
-        hc_yAxis(title = list(text = "Percentage (%)")) %>%
-        hc_title(text = exp_col_max_yr_pct_tt())
     }) %>%
       bindCache(inp_y(), inp_r(), inp_p(), inp_d()) %>%
       bindEvent(input$go)
@@ -1097,59 +1236,93 @@ mod_countries_server <- function(id) {
 
     # Import column charts
     imp_col_min_yr_usd <- reactive({
-      # Get top 4 partners + "Rest of the world" for imports
       min_year <- min(inp_y())
       d <- tbl(con, tbl_dtl)
 
       if (inp_p() == "ALL") {
+        # Show top 4 partners + "Rest of the world" for multilateral trade
         d <- d %>%
           filter(
             !!sym("year") == !!min_year &
             !!sym("reporter_iso") == !!inp_r()
           )
+
+        d <- d %>% collect()
+
+        d <- d %>%
+          inner_join(
+            tbl(con, "countries") %>%
+              select(!!sym("country_iso"), !!sym("country_name")) %>%
+              collect(),
+            by = c("partner_iso" = "country_iso")
+          )
+
+        if (inp_d() != "No") {
+          d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
+        }
+
+        d <- d %>%
+          group_by(!!sym("country_name")) %>%
+          summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+          filter(!!sym("trade_value_usd_imp") > 0) %>%
+          mutate(country_name = fct_lump_n(f = !!sym("country_name"), 
+                                           n = 4, 
+                                           w = !!sym("trade_value_usd_imp"),
+                                           other_level = "Rest of the world")) %>%
+          group_by(!!sym("country_name")) %>%
+          summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+          mutate(country_name = factor(!!sym("country_name"), 
+                                       levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")))
+
+        hchart(d, "column", hcaes(x = "country_name", y = "trade_value_usd_imp"),
+               color = "#518498",
+               tooltip = list(pointFormat = "<b>{point.y:,.0f} USD</b>")) %>%
+          hc_xAxis(title = list(text = "Country")) %>%
+          hc_yAxis(title = list(text = "USD billion"),
+                   labels = list(formatter = JS("function() { return this.value / 1000000000 }"))) %>%
+          hc_title(text = imp_col_min_yr_usd_tt())
       } else {
+        # Show top 4 sections + "Other products" for bilateral trade
         d <- d %>%
           filter(
             !!sym("year") == !!min_year &
             !!sym("reporter_iso") == !!inp_r() &
             !!sym("partner_iso") == !!inp_p()
           )
+
+        d <- d %>%
+          inner_join(
+            tbl(con, "commodities") %>%
+              distinct(!!sym("commodity_code"), !!sym("section_code"), !!sym("section_name"), !!sym("section_color")),
+            by = c("commodity_code", "section_code")
+          ) %>%
+          collect()
+
+        if (inp_d() != "No") {
+          d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
+        }
+
+        d <- d %>%
+          group_by(!!sym("section_name")) %>%
+          summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+          filter(!!sym("trade_value_usd_imp") > 0) %>%
+          mutate(section_name = fct_lump_n(f = !!sym("section_name"), 
+                                           n = 4, 
+                                           w = !!sym("trade_value_usd_imp"),
+                                           other_level = "Other products")) %>%
+          group_by(!!sym("section_name")) %>%
+          summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+          mutate(section_name = factor(!!sym("section_name"), 
+                                       levels = c(setdiff(unique(!!sym("section_name")), "Other products"), "Other products")))
+
+        hchart(d, "column", hcaes(x = "section_name", y = "trade_value_usd_imp"),
+               color = "#518498",
+               tooltip = list(pointFormat = "<b>{point.y:,.0f} USD</b>")) %>%
+          hc_xAxis(title = list(text = "Product Section")) %>%
+          hc_yAxis(title = list(text = "USD billion"),
+                   labels = list(formatter = JS("function() { return this.value / 1000000000 }"))) %>%
+          hc_title(text = imp_col_min_yr_usd_tt())
       }
-
-      d <- d %>% collect()
-
-      d <- d %>%
-        inner_join(
-          tbl(con, "countries") %>%
-            select(!!sym("country_iso"), !!sym("country_name")) %>%
-            collect(),
-          by = c("partner_iso" = "country_iso")
-        )
-
-      if (inp_d() != "No") {
-        d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
-      }
-
-      d <- d %>%
-        group_by(!!sym("country_name")) %>%
-        summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
-        filter(!!sym("trade_value_usd_imp") > 0) %>%
-        mutate(country_name = fct_lump_n(f = !!sym("country_name"), 
-                                         n = 4, 
-                                         w = !!sym("trade_value_usd_imp"),
-                                         other_level = "Rest of the world")) %>%
-        group_by(!!sym("country_name")) %>%
-        summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
-        mutate(country_name = factor(!!sym("country_name"), 
-                                     levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")))
-
-      hchart(d, "column", hcaes(x = "country_name", y = "trade_value_usd_imp"),
-             color = "#518498",
-             tooltip = list(pointFormat = "<b>{point.y:,.0f} USD</b>")) %>%
-        hc_xAxis(title = list(text = "Country")) %>%
-        hc_yAxis(title = list(text = "USD billion"),
-                 labels = list(formatter = JS("function() { return this.value / 1000000000 }"))) %>%
-        hc_title(text = imp_col_min_yr_usd_tt())
     }) %>%
       bindCache(inp_y(), inp_r(), inp_p(), inp_d()) %>%
       bindEvent(input$go)
@@ -1159,54 +1332,89 @@ mod_countries_server <- function(id) {
       d <- tbl(con, tbl_dtl)
 
       if (inp_p() == "ALL") {
+        # Show top 4 partners + "Rest of the world" for multilateral trade
         d <- d %>%
           filter(
             !!sym("year") == !!min_year &
             !!sym("reporter_iso") == !!inp_r()
           )
+
+        d <- d %>% collect()
+
+        d <- d %>%
+          inner_join(
+            tbl(con, "countries") %>%
+              select(!!sym("country_iso"), !!sym("country_name")) %>%
+              collect(),
+            by = c("partner_iso" = "country_iso")
+          )
+
+        if (inp_d() != "No") {
+          d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
+        }
+
+        d <- d %>%
+          group_by(!!sym("country_name")) %>%
+          summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+          filter(!!sym("trade_value_usd_imp") > 0) %>%
+          mutate(country_name = fct_lump_n(f = !!sym("country_name"), 
+                                           n = 4, 
+                                           w = !!sym("trade_value_usd_imp"),
+                                           other_level = "Rest of the world")) %>%
+          group_by(!!sym("country_name")) %>%
+          summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+          mutate(percentage = round(100 * !!sym("trade_value_usd_imp") / sum(!!sym("trade_value_usd_imp")), 1)) %>%
+          mutate(country_name = factor(!!sym("country_name"), 
+                                       levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")))
+
+        hchart(d, "column", hcaes(x = "country_name", y = "percentage"),
+               color = "#518498",
+               tooltip = list(pointFormat = "<b>{point.y}%</b>")) %>%
+          hc_xAxis(title = list(text = "Country")) %>%
+          hc_yAxis(title = list(text = "Percentage (%)")) %>%
+          hc_title(text = imp_col_min_yr_pct_tt())
       } else {
+        # Show top 4 sections + "Other products" for bilateral trade
         d <- d %>%
           filter(
             !!sym("year") == !!min_year &
             !!sym("reporter_iso") == !!inp_r() &
             !!sym("partner_iso") == !!inp_p()
           )
+
+        d <- d %>%
+          inner_join(
+            tbl(con, "commodities") %>%
+              distinct(!!sym("commodity_code"), !!sym("section_code"), !!sym("section_name"), !!sym("section_color")),
+            by = c("commodity_code", "section_code")
+          ) %>%
+          collect()
+
+        if (inp_d() != "No") {
+          d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
+        }
+
+        d <- d %>%
+          group_by(!!sym("section_name")) %>%
+          summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+          filter(!!sym("trade_value_usd_imp") > 0) %>%
+          mutate(section_name = fct_lump_n(f = !!sym("section_name"), 
+                                           n = 4, 
+                                           w = !!sym("trade_value_usd_imp"),
+                                           other_level = "Other products")) %>%
+          group_by(!!sym("section_name")) %>%
+          summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+          mutate(percentage = round(100 * !!sym("trade_value_usd_imp") / sum(!!sym("trade_value_usd_imp")), 1)) %>%
+          mutate(section_name = factor(!!sym("section_name"), 
+                                       levels = c(setdiff(unique(!!sym("section_name")), "Other products"), "Other products")))
+
+        hchart(d, "column", hcaes(x = "section_name", y = "percentage"),
+               color = "#518498",
+               tooltip = list(pointFormat = "<b>{point.y}%</b>")) %>%
+          hc_xAxis(title = list(text = "Product Section")) %>%
+          hc_yAxis(title = list(text = "Percentage (%)")) %>%
+          hc_title(text = imp_col_min_yr_pct_tt())
       }
-
-      d <- d %>% collect()
-
-      d <- d %>%
-        inner_join(
-          tbl(con, "countries") %>%
-            select(!!sym("country_iso"), !!sym("country_name")) %>%
-            collect(),
-          by = c("partner_iso" = "country_iso")
-        )
-
-      if (inp_d() != "No") {
-        d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
-      }
-
-      d <- d %>%
-        group_by(!!sym("country_name")) %>%
-        summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
-        filter(!!sym("trade_value_usd_imp") > 0) %>%
-        mutate(country_name = fct_lump_n(f = !!sym("country_name"), 
-                                         n = 4, 
-                                         w = !!sym("trade_value_usd_imp"),
-                                         other_level = "Rest of the world")) %>%
-        group_by(!!sym("country_name")) %>%
-        summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
-        mutate(percentage = round(100 * !!sym("trade_value_usd_imp") / sum(!!sym("trade_value_usd_imp")), 1)) %>%
-        mutate(country_name = factor(!!sym("country_name"), 
-                                     levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")))
-
-      hchart(d, "column", hcaes(x = "country_name", y = "percentage"),
-             color = "#518498",
-             tooltip = list(pointFormat = "<b>{point.y}%</b>")) %>%
-        hc_xAxis(title = list(text = "Country")) %>%
-        hc_yAxis(title = list(text = "Percentage (%)")) %>%
-        hc_title(text = imp_col_min_yr_pct_tt())
     }) %>%
       bindCache(inp_y(), inp_r(), inp_p(), inp_d()) %>%
       bindEvent(input$go)
@@ -1216,54 +1424,89 @@ mod_countries_server <- function(id) {
       d <- tbl(con, tbl_dtl)
 
       if (inp_p() == "ALL") {
+        # Show top 4 partners + "Rest of the world" for multilateral trade
         d <- d %>%
           filter(
             !!sym("year") == !!max_year &
             !!sym("reporter_iso") == !!inp_r()
           )
+
+        d <- d %>% collect()
+
+        d <- d %>%
+          inner_join(
+            tbl(con, "countries") %>%
+              select(!!sym("country_iso"), !!sym("country_name")) %>%
+              collect(),
+            by = c("partner_iso" = "country_iso")
+          )
+
+        if (inp_d() != "No") {
+          d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
+        }
+
+        d <- d %>%
+          group_by(!!sym("country_name")) %>%
+          summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+          filter(!!sym("trade_value_usd_imp") > 0) %>%
+          mutate(country_name = fct_lump_n(f = !!sym("country_name"), 
+                                           n = 4, 
+                                           w = !!sym("trade_value_usd_imp"),
+                                           other_level = "Rest of the world")) %>%
+          group_by(!!sym("country_name")) %>%
+          summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+          mutate(country_name = factor(!!sym("country_name"), 
+                                       levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")))
+
+        hchart(d, "column", hcaes(x = "country_name", y = "trade_value_usd_imp"),
+               color = "#26667f",
+               tooltip = list(pointFormat = "<b>{point.y:,.0f} USD</b>")) %>%
+          hc_xAxis(title = list(text = "Country")) %>%
+          hc_yAxis(title = list(text = "USD billion"),
+                   labels = list(formatter = JS("function() { return this.value / 1000000000 }"))) %>%
+          hc_title(text = imp_col_max_yr_usd_tt())
       } else {
+        # Show top 4 sections + "Other products" for bilateral trade
         d <- d %>%
           filter(
             !!sym("year") == !!max_year &
             !!sym("reporter_iso") == !!inp_r() &
             !!sym("partner_iso") == !!inp_p()
           )
+
+        d <- d %>%
+          inner_join(
+            tbl(con, "commodities") %>%
+              distinct(!!sym("commodity_code"), !!sym("section_code"), !!sym("section_name"), !!sym("section_color")),
+            by = c("commodity_code", "section_code")
+          ) %>%
+          collect()
+
+        if (inp_d() != "No") {
+          d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
+        }
+
+        d <- d %>%
+          group_by(!!sym("section_name")) %>%
+          summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+          filter(!!sym("trade_value_usd_imp") > 0) %>%
+          mutate(section_name = fct_lump_n(f = !!sym("section_name"), 
+                                           n = 4, 
+                                           w = !!sym("trade_value_usd_imp"),
+                                           other_level = "Other products")) %>%
+          group_by(!!sym("section_name")) %>%
+          summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+          mutate(section_name = factor(!!sym("section_name"), 
+                                       levels = c(setdiff(unique(!!sym("section_name")), "Other products"), "Other products")))
+
+        hchart(d, "column", hcaes(x = "section_name", y = "trade_value_usd_imp"),
+               color = "#26667f",
+               tooltip = list(pointFormat = "<b>{point.y:,.0f} USD</b>")) %>%
+          hc_xAxis(title = list(text = "Product Section")) %>%
+          hc_yAxis(title = list(text = "USD billion"),
+                   labels = list(formatter = JS("function() { return this.value / 1000000000 }"))) %>%
+          hc_title(text = imp_col_max_yr_usd_tt())
       }
-
-      d <- d %>% collect()
-
-      d <- d %>%
-        inner_join(
-          tbl(con, "countries") %>%
-            select(!!sym("country_iso"), !!sym("country_name")) %>%
-            collect(),
-          by = c("partner_iso" = "country_iso")
-        )
-
-      if (inp_d() != "No") {
-        d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
-      }
-
-      d <- d %>%
-        group_by(!!sym("country_name")) %>%
-        summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
-        filter(!!sym("trade_value_usd_imp") > 0) %>%
-        mutate(country_name = fct_lump_n(f = !!sym("country_name"), 
-                                         n = 4, 
-                                         w = !!sym("trade_value_usd_imp"),
-                                         other_level = "Rest of the world")) %>%
-        group_by(!!sym("country_name")) %>%
-        summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
-        mutate(country_name = factor(!!sym("country_name"), 
-                                     levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")))
-
-      hchart(d, "column", hcaes(x = "country_name", y = "trade_value_usd_imp"),
-             color = "#26667f",
-             tooltip = list(pointFormat = "<b>{point.y:,.0f} USD</b>")) %>%
-        hc_xAxis(title = list(text = "Country")) %>%
-        hc_yAxis(title = list(text = "USD billion"),
-                 labels = list(formatter = JS("function() { return this.value / 1000000000 }"))) %>%
-        hc_title(text = imp_col_max_yr_usd_tt())
     }) %>%
       bindCache(inp_y(), inp_r(), inp_p(), inp_d()) %>%
       bindEvent(input$go)
@@ -1273,54 +1516,89 @@ mod_countries_server <- function(id) {
       d <- tbl(con, tbl_dtl)
 
       if (inp_p() == "ALL") {
+        # Show top 4 partners + "Rest of the world" for multilateral trade
         d <- d %>%
           filter(
             !!sym("year") == !!max_year &
             !!sym("reporter_iso") == !!inp_r()
           )
+
+        d <- d %>% collect()
+
+        d <- d %>%
+          inner_join(
+            tbl(con, "countries") %>%
+              select(!!sym("country_iso"), !!sym("country_name")) %>%
+              collect(),
+            by = c("partner_iso" = "country_iso")
+          )
+
+        if (inp_d() != "No") {
+          d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
+        }
+
+        d <- d %>%
+          group_by(!!sym("country_name")) %>%
+          summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+          filter(!!sym("trade_value_usd_imp") > 0) %>%
+          mutate(country_name = fct_lump_n(f = !!sym("country_name"), 
+                                           n = 4, 
+                                           w = !!sym("trade_value_usd_imp"),
+                                           other_level = "Rest of the world")) %>%
+          group_by(!!sym("country_name")) %>%
+          summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+          mutate(percentage = round(100 * !!sym("trade_value_usd_imp") / sum(!!sym("trade_value_usd_imp")), 1)) %>%
+          mutate(country_name = factor(!!sym("country_name"), 
+                                       levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")))
+
+        hchart(d, "column", hcaes(x = "country_name", y = "percentage"),
+               color = "#26667f",
+               tooltip = list(pointFormat = "<b>{point.y}%</b>")) %>%
+          hc_xAxis(title = list(text = "Country")) %>%
+          hc_yAxis(title = list(text = "Percentage (%)")) %>%
+          hc_title(text = imp_col_max_yr_pct_tt())
       } else {
+        # Show top 4 sections + "Other products" for bilateral trade
         d <- d %>%
           filter(
             !!sym("year") == !!max_year &
             !!sym("reporter_iso") == !!inp_r() &
             !!sym("partner_iso") == !!inp_p()
           )
+
+        d <- d %>%
+          inner_join(
+            tbl(con, "commodities") %>%
+              distinct(!!sym("commodity_code"), !!sym("section_code"), !!sym("section_name"), !!sym("section_color")),
+            by = c("commodity_code", "section_code")
+          ) %>%
+          collect()
+
+        if (inp_d() != "No") {
+          d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
+        }
+
+        d <- d %>%
+          group_by(!!sym("section_name")) %>%
+          summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+          filter(!!sym("trade_value_usd_imp") > 0) %>%
+          mutate(section_name = fct_lump_n(f = !!sym("section_name"), 
+                                           n = 4, 
+                                           w = !!sym("trade_value_usd_imp"),
+                                           other_level = "Other products")) %>%
+          group_by(!!sym("section_name")) %>%
+          summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+          mutate(percentage = round(100 * !!sym("trade_value_usd_imp") / sum(!!sym("trade_value_usd_imp")), 1)) %>%
+          mutate(section_name = factor(!!sym("section_name"), 
+                                       levels = c(setdiff(unique(!!sym("section_name")), "Other products"), "Other products")))
+
+        hchart(d, "column", hcaes(x = "section_name", y = "percentage"),
+               color = "#26667f",
+               tooltip = list(pointFormat = "<b>{point.y}%</b>")) %>%
+          hc_xAxis(title = list(text = "Product Section")) %>%
+          hc_yAxis(title = list(text = "Percentage (%)")) %>%
+          hc_title(text = imp_col_max_yr_pct_tt())
       }
-
-      d <- d %>% collect()
-
-      d <- d %>%
-        inner_join(
-          tbl(con, "countries") %>%
-            select(!!sym("country_iso"), !!sym("country_name")) %>%
-            collect(),
-          by = c("partner_iso" = "country_iso")
-        )
-
-      if (inp_d() != "No") {
-        d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
-      }
-
-      d <- d %>%
-        group_by(!!sym("country_name")) %>%
-        summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
-        filter(!!sym("trade_value_usd_imp") > 0) %>%
-        mutate(country_name = fct_lump_n(f = !!sym("country_name"), 
-                                         n = 4, 
-                                         w = !!sym("trade_value_usd_imp"),
-                                         other_level = "Rest of the world")) %>%
-        group_by(!!sym("country_name")) %>%
-        summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
-        mutate(percentage = round(100 * !!sym("trade_value_usd_imp") / sum(!!sym("trade_value_usd_imp")), 1)) %>%
-        mutate(country_name = factor(!!sym("country_name"), 
-                                     levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")))
-
-      hchart(d, "column", hcaes(x = "country_name", y = "percentage"),
-             color = "#26667f",
-             tooltip = list(pointFormat = "<b>{point.y}%</b>")) %>%
-        hc_xAxis(title = list(text = "Country")) %>%
-        hc_yAxis(title = list(text = "Percentage (%)")) %>%
-        hc_title(text = imp_col_max_yr_pct_tt())
     }) %>%
       bindCache(inp_y(), inp_r(), inp_p(), inp_d()) %>%
       bindEvent(input$go)
