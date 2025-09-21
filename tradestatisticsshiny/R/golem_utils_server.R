@@ -4,13 +4,14 @@ available_formats <- function() {
 }
 
 #' SQL connection
-sql_con <- function() {
+sql_con <- function() { 
   dbPool(
     drv = Postgres(),
-    dbname = "tradestatistics",
-    host = "localhost",
+    dbname = Sys.getenv("TRADESTATISTICS_SQL_NAME"),
+    host = Sys.getenv("TRADESTATISTICS_SQL_HOST"),
     user = Sys.getenv("TRADESTATISTICS_SQL_USR"),
-    password = Sys.getenv("TRADESTATISTICS_SQL_PWD")
+    password = Sys.getenv("TRADESTATISTICS_SQL_PWD"),
+    port = Sys.getenv("TRADESTATISTICS_SQL_PORT")
   )
 }
 
