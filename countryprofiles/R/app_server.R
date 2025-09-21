@@ -2,7 +2,7 @@
 #'
 #' @param input,output,session Internal parameters for {shiny}.
 #'     DO NOT REMOVE.
-#' @importFrom dplyr arrange bind_rows case_when collect dense_rank desc
+#' @importFrom dplyr arrange bind_rows case_when coalesce collect dense_rank desc
 #'     distinct everything filter group_by inner_join left_join mutate select summarise
 #'     tbl tibble ungroup pull slice_head
 #' @importFrom forcats fct_lump_n
@@ -74,11 +74,6 @@ app_server <- function(input, output, session) {
 
     d <- df_dtl() %>%
       filter(year == !!yr) %>%
-      # mutate(
-      #   section_code = as.character(section_code),
-      #   trade_value_usd_exp = dplyr::coalesce(trade_value_usd_exp, 0),
-      #   trade_value_usd_imp = dplyr::coalesce(trade_value_usd_imp, 0)
-      # ) %>%
       group_by(section_code) %>%
       summarise(
         trade_exp = sum(trade_value_usd_exp, na.rm = TRUE),
@@ -93,8 +88,8 @@ app_server <- function(input, output, session) {
       d <- d %>%
         left_join(cs, by = "section_code") %>%
         mutate(
-          section_name = dplyr::coalesce(section_name, "Other products"),
-          section_color = dplyr::coalesce(section_color, "#434348")
+          section_name = coalesce(section_name, "Other products"),
+          section_color = coalesce(section_color, "#434348")
         ) %>%
         select(section_code, section_name, section_color, trade_exp, trade_imp, exchange)
     }
@@ -243,10 +238,8 @@ app_server <- function(input, output, session) {
       select(section_code, section_name, section_color, commodity_code_short, commodity_code) %>%
       distinct() %>%
       left_join(d_raw, by = c("section_code", "section_name", "commodity_code_short")) %>%
-      mutate(trade_exp = dplyr::coalesce(trade_exp, 0), trade_imp = dplyr::coalesce(trade_imp, 0)) %>%
+      mutate(trade_exp = coalesce(trade_exp, 0), trade_imp = coalesce(trade_imp, 0)) %>%
       arrange(section_name)
-
-
 
     master
   })
@@ -478,7 +471,7 @@ app_server <- function(input, output, session) {
   "yrp" = glue("The exports of { r_add_the(rname()) } { rname() } to { p_add_the(pname()) } { pname() } { exports_growth_increase_decrease() } from
                           { exp_val_min_yr_2() } in { min(inp_y()) }
                           to { exp_val_max_yr_2() } in { max(inp_y()) } (annualized { exports_growth_increase_decrease_2() } of
-                          { exports_growth_2() }). { p_add_the() } { pname() } was the No. { trd_rankings_no_min_yr() } trading partner of
+                          { exports_growth_2() }). { p_add_the(pname()) } { pname() } was the No. { trd_rankings_no_min_yr() } trading partner of
           { r_add_the(rname()) } { rname() } in { min(inp_y()) } (represented { trd_rankings_exp_share_min_yr_2() } of its exports), and
                           then { trd_rankings_remained() } No. { trd_rankings_no_max_yr() } in { max(inp_y()) } (represented { trd_rankings_exp_share_max_yr_2() }
                           of its exports).")
@@ -493,7 +486,7 @@ app_server <- function(input, output, session) {
   "yrp" = glue("The imports of { r_add_the(rname()) } { rname() } to { p_add_the(pname()) } { pname() } { imports_growth_increase_decrease() } from
                           { imp_val_min_yr_2() } in { min(inp_y()) }
                           to { imp_val_max_yr_2() } in { max(inp_y()) } (annualized { imports_growth_increase_decrease_2() } of
-                          { imports_growth_2() }). { p_add_the() } { pname() } was the No. { trd_rankings_no_min_yr() } trading partner of
+                          { imports_growth_2() }). { p_add_the(pname()) } { pname() } was the No. { trd_rankings_no_min_yr() } trading partner of
           { r_add_the(rname()) } { rname() } in { min(inp_y()) } (represented { trd_rankings_imp_share_min_yr_2() } of its imports), and
                           then { trd_rankings_remained() } No. { trd_rankings_no_max_yr() } in { max(inp_y()) } (represented { trd_rankings_imp_share_max_yr_2() }
                           of its imports).")
@@ -552,8 +545,8 @@ app_server <- function(input, output, session) {
 
   exp_tt_yr <- eventReactive(input$go, {
     switch(tbl_dtl(),
-      "yrc" = glue("Exports of { r_add_the() } { rname() } to the rest of the World in { min(inp_y()) } and { max(inp_y()) }, by product"),
-      "yrpc" = glue("Exports of { r_add_the() } { rname() } to { p_add_the() } { pname() } in { min(inp_y()) } and { max(inp_y()) }, by product")
+  "yrc" = glue("Exports of { r_add_the(rname()) } { rname() } to the rest of the World in { min(inp_y()) } and { max(inp_y()) }, by product"),
+  "yrpc" = glue("Exports of { r_add_the(rname()) } { rname() } to { p_add_the(pname()) } { pname() } in { min(inp_y()) } and { max(inp_y()) }, by product")
     )
   })
 
@@ -567,11 +560,6 @@ app_server <- function(input, output, session) {
     
     d <- df_dtl() %>%
       filter(year %in% !!years) %>%
-      mutate(
-        trade_value_usd_exp = dplyr::coalesce(trade_value_usd_exp, 0),
-        trade_value_usd_imp = dplyr::coalesce(trade_value_usd_imp, 0),
-        section_code = as.character(section_code)
-      ) %>%
       group_by(year, section_code, section_name, section_color) %>%
       summarise(
         trade_exp = sum(trade_value_usd_exp, na.rm = TRUE),
@@ -590,8 +578,8 @@ app_server <- function(input, output, session) {
       # join with canonical sections to get proper names/colors for "other"
       left_join(cs, by = c("section_code_mapped" = "section_code"), suffix = c("_orig", "_canonical")) %>%
       mutate(
-        section_name_final = dplyr::coalesce(section_name_canonical, section_name_orig, "Other products"),
-        section_color_final = dplyr::coalesce(section_color_canonical, section_color_orig, "#434348")
+        section_name_final = coalesce(section_name_canonical, section_name_orig, "Other products"),
+        section_color_final = coalesce(section_color_canonical, section_color_orig, "#434348")
       ) %>%
       group_by(year, section_code_mapped, section_name_final, section_color_final) %>%
       summarise(
@@ -636,13 +624,6 @@ app_server <- function(input, output, session) {
     # compute exchange (exports + imports) by section across selected years
     totals <- df_dtl() %>%
       filter(year %in% !!inp_y()) %>%
-      mutate(
-        section_code = as.character(section_code),
-        section_name = as.character(section_name),
-        section_color = as.character(section_color),
-        trade_value_usd_exp = dplyr::coalesce(trade_value_usd_exp, 0),
-        trade_value_usd_imp = dplyr::coalesce(trade_value_usd_imp, 0)
-      ) %>%
       group_by(section_code, section_name, section_color) %>%
       summarise(exchange = sum(trade_value_usd_exp + trade_value_usd_imp, na.rm = TRUE), .groups = "drop") %>%
       arrange(desc(exchange))
@@ -696,8 +677,8 @@ app_server <- function(input, output, session) {
 
   imp_tt_yr <- eventReactive(input$go, {
     switch(tbl_dtl(),
-      "yrc" = glue("Imports of { r_add_the() } { rname() } from the rest of the World in { min(inp_y()) } and { max(inp_y()) }, by product"),
-      "yrpc" = glue("Imports of { r_add_the() } { rname() } from { p_add_the() } { pname() } in { min(inp_y()) } and { max(inp_y()) }, by product")
+  "yrc" = glue("Imports of { r_add_the(rname()) } { rname() } from the rest of the World in { min(inp_y()) } and { max(inp_y()) }, by product"),
+  "yrpc" = glue("Imports of { r_add_the(rname()) } { rname() } from { p_add_the(pname()) } { pname() } in { min(inp_y()) } and { max(inp_y()) }, by product")
     )
   })
 
@@ -714,13 +695,6 @@ app_server <- function(input, output, session) {
 
     d <- df_dtl() %>%
       filter(year %in% !!years) %>%
-      mutate(
-        section_code = as.character(section_code),
-        section_name = as.character(section_name),
-        section_color = as.character(section_color),
-        trade_value_usd_exp = dplyr::coalesce(trade_value_usd_exp, 0),
-        trade_value_usd_imp = dplyr::coalesce(trade_value_usd_imp, 0)
-      ) %>%
       group_by(year, section_code, section_name, section_color) %>%
       summarise(
         trade_imp = sum(trade_value_usd_imp, na.rm = TRUE),
@@ -738,8 +712,8 @@ app_server <- function(input, output, session) {
       # join with canonical sections to get proper names/colors for "other"
       left_join(cs, by = c("section_code_mapped" = "section_code"), suffix = c("_orig", "_canonical")) %>%
       mutate(
-        section_name_final = dplyr::coalesce(section_name_canonical, section_name_orig, "Other products"),
-        section_color_final = dplyr::coalesce(section_color_canonical, section_color_orig, "#434348")
+        section_name_final = coalesce(section_name_canonical, section_name_orig, "Other products"),
+        section_color_final = coalesce(section_color_canonical, section_color_orig, "#434348")
       ) %>%
       group_by(year, section_code_mapped, section_name_final, section_color_final) %>%
       summarise(
@@ -792,7 +766,7 @@ app_server <- function(input, output, session) {
   imp_tt_max_yr <- eventReactive(input$go, {
     glue("Imports in { max(inp_y()) }")
   })
-  
+
 
   imp_tm_dtl_max_yr <- reactive({
     d <- df_dtl() %>%
