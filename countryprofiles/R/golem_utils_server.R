@@ -5,19 +5,17 @@ available_formats <- function() {
 }
 
 #' SQL connection
-#' @importFrom pool dbPool
+#' @importFrom pool dbPool poolClose
 #' @importFrom RPostgres Postgres
 #' @export
 sql_con <- function() {
-  con <- dbPool(
+  dbPool(
     drv = Postgres(),
     dbname = "tradestatistics",
     host = "localhost",
     user = Sys.getenv("TRADESTATISTICS_SQL_USR"),
     password = Sys.getenv("TRADESTATISTICS_SQL_PWD")
   )
-
-  return(con)
 }
 
 # ORIGIN/DESTINATION TREEMAPS -----
@@ -53,7 +51,7 @@ lvl_opts <- list(
   )
 )
 
-  
+
 #' Custom Tooltip (For Highcharter Visuals)
 #' @importFrom highcharter JS
 #' @export
@@ -200,12 +198,14 @@ p_aggregate_products <- function(d, con) {
   d %>%
     inner_join(
       tbl(con, "commodities") %>%
-        select(!!sym("commodity_code"), !!sym("commodity_code_short"), !!sym("section_code"),
-          !!sym("section_color"), !!sym("section_name")) %>%
+        select(
+          !!sym("commodity_code"), !!sym("commodity_code_short"), !!sym("section_code"),
+          !!sym("section_color"), !!sym("section_name")
+        ) %>%
         collect()
     ) %>%
     group_by(
-      !!sym("commodity_code"), !!sym("commodity_code_short"), !!sym("section_code"), 
+      !!sym("commodity_code"), !!sym("commodity_code_short"), !!sym("section_code"),
       !!sym("section_color"), !!sym("section_name")
     ) %>%
     summarise(trade_value = sum(!!sym("trade_value"), na.rm = T)) %>%
@@ -269,13 +269,15 @@ p_to_highcharts <- function(d, d2) {
       formatter = data_labels()
     )
   )
-}# Small grammar helpers used by glue templates in the app_server
+} # Small grammar helpers used by glue templates in the app_server
 # These used to live in the app namespace; define safe fallbacks here so
 # glues don't fail when the functions are referenced during rendering.
 #' @export
 r_add_the <- function(name = NULL) {
   # Return 'the' for reporter names that typically take the article
-  if (is.null(name)) return("")
+  if (is.null(name)) {
+    return("")
+  }
   if (substr(name, 1, 6) == "United" || substr(name, 1, 3) == "USA" || substr(name, 1, 7) == "Russian") {
     return("the")
   }
@@ -285,7 +287,9 @@ r_add_the <- function(name = NULL) {
 #' @export
 r_add_upp_the <- function(name = NULL) {
   v <- r_add_the(name)
-  if (nchar(v) == 0) return("")
+  if (nchar(v) == 0) {
+    return("")
+  }
   # Capitalize only the first letter ("The") rather than returning all caps
   paste0(toupper(substr(v, 1, 1)), tolower(substr(v, 2, nchar(v))))
 }
@@ -293,7 +297,9 @@ r_add_upp_the <- function(name = NULL) {
 #' @export
 p_add_the <- function(name = NULL) {
   # same logic for partner names
-  if (is.null(name)) return("")
+  if (is.null(name)) {
+    return("")
+  }
   if (substr(name, 1, 6) == "United" || substr(name, 1, 3) == "USA" || substr(name, 1, 7) == "Russian") {
     return("the")
   }
