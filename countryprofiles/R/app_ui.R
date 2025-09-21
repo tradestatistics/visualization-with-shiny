@@ -41,7 +41,7 @@ app_ui <- function(request) {
           ),
           tabItem(
             tabName = "products",
-            h1("complete soon")
+            mod_products_ui("products")
           ),
           tabItem(
             tabName = "cite",

@@ -18,15 +18,13 @@
 #' @importFrom waiter Waitress
 #' @noRd
 app_server <- function(input, output, session) {
-  # Countries module ----
+  # Modules ----
   mod_countries_server("countries")
-
-  # Cite module ----
+  mod_products_server("products")
   mod_cite_server("cite")
 
   # Hide boxes until viz is ready ----
-
-  ## observe the button being pressed
+  
   observeEvent(input$go, {
     if (input$go > 0) {
       show(id = "aggregated_trade")
