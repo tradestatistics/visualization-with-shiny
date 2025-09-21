@@ -227,15 +227,6 @@ mod_products_server <- function(id) {
       input$fmt
     }) # format
 
-    tbl_agg <- eventReactive(input$go, {
-      "yr"  # year-reporter aggregated data
-    })
-
-    tbl_dtl <- eventReactive(input$go, {
-      # "yrc"
-      "yrpc"
-    })
-
     # Human-readable section name for glue templates
     section_name <- eventReactive(input$go, {
       s_code <- inp_s()
@@ -310,7 +301,7 @@ mod_products_server <- function(id) {
       bindEvent(input$go)
 
     df_dtl <- reactive({
-      d <- tbl(con, tbl_dtl()) %>%
+      d <- tbl(con, "yrpc") %>%
         filter(!!sym("year") %in% !!inp_y())
 
       # Filter by section/commodity if specified
@@ -342,7 +333,7 @@ mod_products_server <- function(id) {
 
       return(d)
     }) %>%
-      bindCache(inp_y(), inp_s(), inp_d(), tbl_dtl()) %>%
+      bindCache(inp_y(), inp_s(), inp_d(), "yrpc") %>%
       bindEvent(input$go)
 
     ## Trade ----
