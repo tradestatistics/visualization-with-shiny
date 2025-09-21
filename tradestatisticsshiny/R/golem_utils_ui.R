@@ -1,18 +1,3 @@
-available_all <- function() {
-  c("All Products" = "all")
-}
-
-available_logicals <- function() {
-  c("Yes" = "yes", "No" = "no")
-}
-
-available_models <- function() {
-  c(
-    "Poisson Pseudo Maximum Likelihood (PPML)" = "ppml",
-    "Ordinary Least Squares (OLS) [Not Recommended]" = "ols"
-  )
-}
-
 available_yrs <- function() {
   1988L:2023L
 }

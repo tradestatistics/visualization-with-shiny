@@ -2,20 +2,6 @@
 #'
 #' @param input,output,session Internal parameters for {shiny}.
 #'     DO NOT REMOVE.
-#' @importFrom dplyr arrange bind_rows case_when coalesce collect dense_rank desc
-#'     distinct everything filter group_by inner_join left_join mutate select summarise
-#'     tbl tibble ungroup pull slice_head
-#' @importFrom forcats fct_lump_n
-#' @importFrom glue glue
-#' @importFrom highcharter hcaes hchart hc_title hc_xAxis
-#'     hc_yAxis JS renderHighchart hc_legend
-#' @importFrom lubridate day year
-#' @importFrom rio export
-#' @importFrom rlang sym
-#' @importFrom shinyhelper observe_helpers
-#' @importFrom shinyjs hide show
-#' @importFrom tidyr pivot_longer
-#' @importFrom waiter Waitress
 #' @noRd
 app_server <- function(input, output, session) {
   # Modules ----

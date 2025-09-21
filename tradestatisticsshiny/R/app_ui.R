@@ -4,11 +4,6 @@
 #'     DO NOT REMOVE.
 #' @import shiny
 #' @import shinydashboard
-#' @importFrom highcharter highchartOutput
-#' @importFrom shinyhelper helper
-#' @importFrom shinyjs useShinyjs
-#' @importFrom waiter useWaitress
-#' @importFrom golem add_resource_path favicon bundle_resources
 #' @noRd
 app_ui <- function(request) {
   tagList(
@@ -72,7 +67,6 @@ app_ui <- function(request) {
 #' resources inside the Shiny application.
 #'
 #' @import shiny
-#' @importFrom golem add_resource_path activate_js favicon bundle_resources
 #' @noRd
 golem_add_external_resources <- function() {
   add_resource_path(

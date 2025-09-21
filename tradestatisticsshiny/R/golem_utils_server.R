@@ -4,8 +4,6 @@ available_formats <- function() {
 }
 
 #' SQL connection
-#' @importFrom pool dbPool dbIsValid poolClose 
-#' @importFrom RPostgres Postgres
 sql_con <- function() {
   dbPool(
     drv = Postgres(),
@@ -51,20 +49,17 @@ lvl_opts <- list(
 
 
 #' Custom Tooltip (For Highcharter Visuals)
-#' @importFrom highcharter JS
 custom_tooltip <- function() {
   JS("function() {\n                var raw = (this.point && this.point.raw_value != null) ? this.point.raw_value : this.value;\n                return '<b>' + this.name + '</b>' + '<br>' +\n                       'Share: ' + Math.round(raw / this.series.tree.val * 10000)/100 + '%' + '<br>' +\n                       'Value: ' + Highcharts.numberFormat(raw, 0) + ' USD'\n                       }")
 }
 
 #' Custom Short Tooltip (For Highcharter Visuals)
-#' @importFrom highcharter JS
 custom_tooltip_short <- function() {
   JS("function() { return '<b>' + this.series.name + '</b>' + ' ' +
      Highcharts.numberFormat(this.y, 0) + ' USD' }")
 }
 
 #' Custom Data Labels (For Highcharter Visuals)
-#' @importFrom highcharter JS
 data_labels <- function() {
   JS("function() { return this.key + '<br>' + Math.round(this.point.value / this.point.series.tree.val * 10000 ) / 100 + '%'}")
 }
@@ -72,8 +67,6 @@ data_labels <- function() {
 #' Origin-Destination to Highcharter (For Highcharter Visuals)
 #' @param d input dataset for values
 #' @param d2 input dataset for colours
-#' @importFrom dplyr arrange desc distinct group_by mutate pull summarise ungroup
-#' @importFrom highcharter data_to_hierarchical hchart
 od_to_highcharts <- function(d, d2) {
   dd <- d %>%
     mutate(continent_name = factor(!!sym("continent_name"), levels = d2$continent_name)) %>%
@@ -120,10 +113,6 @@ od_to_highcharts <- function(d, d2) {
 #' @param d input dataset
 #' @param col column to collapse
 #' @param con SQL connection
-#' @importFrom dplyr arrange distinct filter group_by mutate pull rename
-#'     select summarise ungroup
-#' @importFrom purrr map_df
-#' @importFrom rlang sym
 p_aggregate_by_section <- function(d, col, con) {
   d <- d %>%
     select(!!sym("commodity_code"), !!sym("section_code"), !!sym(col)) %>%
@@ -162,8 +151,6 @@ p_aggregate_by_section <- function(d, col, con) {
 #' Colorize Products (For Highcharter Visuals)
 #' @param d input dataset
 #' @param con SQL connection
-#' @importFrom dplyr collect distinct inner_join tbl
-#' @importFrom rlang sym
 p_colors <- function(d, con) {
   d %>%
     distinct(!!sym("section_name")) %>%
@@ -183,40 +170,35 @@ p_colors <- function(d, con) {
 #' Aggregate Products (For Highcharter Visuals)
 #' @param d input dataset
 #' @param con SQL connection
-#' @importFrom dplyr collect filter group_by left_join mutate select
-#'     summarise tbl ungroup
 p_aggregate_products <- function(d, con) {
-  d %>%
-    inner_join(
-      tbl(con, "commodities") %>%
-        select(
-          !!sym("commodity_code"), !!sym("commodity_code_short"), !!sym("section_code"),
-          !!sym("section_color"), !!sym("section_name")
-        ) %>%
-        collect(),
-        by = c("commodity_code", "section_code")
-    ) %>%
-    group_by(
+  # Get all commodity data in one query to avoid multiple database hits
+  commodities_data <- tbl(con, "commodities") %>%
+    select(
       !!sym("commodity_code"), !!sym("commodity_code_short"), !!sym("section_code"),
       !!sym("section_color"), !!sym("section_name")
     ) %>%
-    summarise(trade_value = sum(!!sym("trade_value"), na.rm = T)) %>%
-    ungroup() %>%
     left_join(
       tbl(con, "commodities_short") %>%
         select(!!sym("commodity_code"),
           commodity_name = !!sym("commodity_name")
-        ) %>%
-        collect(),
+        ),
       by = c("commodity_code_short" = "commodity_code")
-    )
+    ) %>%
+    collect()
+
+  d %>%
+    inner_join(commodities_data, by = c("commodity_code", "section_code")) %>%
+    group_by(
+      !!sym("commodity_code"), !!sym("commodity_code_short"), !!sym("section_code"),
+      !!sym("section_color"), !!sym("section_name"), !!sym("commodity_name")
+    ) %>%
+    summarise(trade_value = sum(!!sym("trade_value"), na.rm = T), .groups = "drop") %>%
+    ungroup()
 }
 
 #' Product to Highcharter (For Highcharter Visuals)
 #' @param d input dataset for values
 #' @param d2 input dataset for colours
-#' @importFrom dplyr arrange desc distinct group_by mutate_if pull summarise ungroup
-#' @importFrom highcharter data_to_hierarchical hchart
 p_to_highcharts <- function(d, d2) {
   dd <- d %>%
     mutate(section_name = factor(!!sym("section_name"), levels = d2$section_name)) %>%

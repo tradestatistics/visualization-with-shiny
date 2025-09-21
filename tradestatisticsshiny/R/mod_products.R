@@ -5,11 +5,6 @@
 #' @param id,input,output,session Internal parameters for {shiny}.
 #'
 #' @noRd
-#'
-#' @importFrom shiny NS tagList fluidRow selectInput sliderInput actionButton
-#'     htmlOutput uiOutput h2 tags div
-#' @importFrom highcharter highchartOutput
-#' @importFrom shinyhelper helper
 mod_products_ui <- function(id) {
   ns <- NS(id)
   tagList(
@@ -44,10 +39,12 @@ mod_products_ui <- function(id) {
           helper(
             type = "inline",
             title = "Section/Commodity",
-            content = c("Subset the data for for any official section or commodity in the Harmonised System.",
-                        "",
-                        "<b>References</b>",
-                        "Hossain, K. and Nyirongo, V.<i><a href='https://unstats.un.org/wiki/display/comtrade/HS+2012+Classification+by+Section'>HS 2012 Classification by Section</a></i>. UN Stats Wiki, 2021."),
+            content = c(
+              "Subset the data for for any official section or commodity in the Harmonised System.",
+              "",
+              "<b>References</b>",
+              "Hossain, K. and Nyirongo, V.<i><a href='https://unstats.un.org/wiki/display/comtrade/HS+2012+Classification+by+Section'>HS 2012 Classification by Section</a></i>. UN Stats Wiki, 2021."
+            ),
             buttonLabel = "Got it!",
             easyClose = FALSE,
             fade = TRUE,
@@ -177,30 +174,13 @@ mod_products_ui <- function(id) {
 #' products Server Functions
 #'
 #' @noRd
-#' @importFrom shiny moduleServer reactive eventReactive observe observeEvent
-#'     renderText renderUI updateSelectizeInput downloadHandler req
-#' @importFrom dplyr arrange bind_rows case_when coalesce collect dense_rank desc
-#'     distinct everything filter group_by inner_join left_join mutate select summarise
-#'     tbl tibble ungroup pull slice_head
-#' @importFrom pool dbIsValid poolClose
-#' @importFrom forcats fct_lump_n
-#' @importFrom glue glue
-#' @importFrom highcharter hcaes hchart hc_title hc_xAxis
-#'     hc_yAxis JS renderHighchart hc_legend
-#' @importFrom lubridate day year
-#' @importFrom rio export
-#' @importFrom rlang sym
-#' @importFrom shinyhelper observe_helpers
-#' @importFrom shinyjs hide show
-#' @importFrom tidyr pivot_longer
-#' @importFrom waiter Waitress
 mod_products_server <- function(id) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
     # Connect to SQL ----
     con <- sql_con()
-    
+
     session$onSessionEnded(function() {
       if (!is.null(con) && dbIsValid(con)) {
         poolClose(con)
@@ -233,21 +213,23 @@ mod_products_server <- function(id) {
       if (is.null(s_code) || length(s_code) == 0) {
         return("Products")
       }
-      
+
       if (nchar(s_code) == 2) {
         s <- names(tradestatisticsshiny::sections_display[
-          tradestatisticsshiny::sections_display == s_code])
+          tradestatisticsshiny::sections_display == s_code
+        ])
         if (length(s) > 0 && !is.na(s) && nchar(s) > 0) {
           return(gsub(".* - ", "", s))
         }
       } else if (nchar(s_code) == 4) {
         s <- names(tradestatisticsshiny::commodities_short_display[
-          tradestatisticsshiny::commodities_short_display == s_code])
+          tradestatisticsshiny::commodities_short_display == s_code
+        ])
         if (length(s) > 0 && !is.na(s) && nchar(s) > 0) {
           return(gsub(".* - ", "", s))
         }
       }
-      
+
       return(s_code)
     })
 
@@ -314,7 +296,7 @@ mod_products_server <- function(id) {
             filter(!!sym("section_code") == !!inp_s())
         }
       }
-        
+
       # Join with commodities table to get product names and colors
       d <- d %>%
         inner_join(
@@ -465,15 +447,18 @@ mod_products_server <- function(id) {
       wt$inc(1)
 
       hchart(d,
-             "column",
-             hcaes(x = "year", y = "trade", group = "flow"),
-             color = flow_colors,
-             tooltip = list(
-               pointFormatter = custom_tooltip_short()
-             )) %>%
+        "column",
+        hcaes(x = "year", y = "trade", group = "flow"),
+        color = flow_colors,
+        tooltip = list(
+          pointFormatter = custom_tooltip_short()
+        )
+      ) %>%
         hc_xAxis(title = list(text = "Year")) %>%
-        hc_yAxis(title = list(text = "USD billion"),
-                 labels = list(formatter = JS("function() { return this.value / 1000000000 }"))) %>%
+        hc_yAxis(
+          title = list(text = "USD billion"),
+          labels = list(formatter = JS("function() { return this.value / 1000000000 }"))
+        ) %>%
         hc_title(text = trd_exc_columns_title())
     }) %>%
       bindCache(inp_y(), inp_s(), inp_d()) %>%
@@ -491,15 +476,15 @@ mod_products_server <- function(id) {
     exp_col_min_yr_usd_tt <- eventReactive(input$go, {
       glue("Exports in { min(inp_y()) } (USD)")
     })
-    
+
     exp_col_min_yr_pct_tt <- eventReactive(input$go, {
       glue("Exports in { min(inp_y()) } (%)")
     })
-    
+
     exp_col_max_yr_usd_tt <- eventReactive(input$go, {
       glue("Exports in { max(inp_y()) } (USD)")
     })
-    
+
     exp_col_max_yr_pct_tt <- eventReactive(input$go, {
       glue("Exports in { max(inp_y()) } (%)")
     })
@@ -518,21 +503,27 @@ mod_products_server <- function(id) {
         group_by(!!sym("country_name")) %>%
         summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
         filter(!!sym("trade_value_usd_imp") > 0) %>%
-        mutate(country_name = fct_lump_n(f = !!sym("country_name"), 
-                                         n = 4, 
-                                         w = !!sym("trade_value_usd_imp"),
-                                         other_level = "Rest of the world")) %>%
+        mutate(country_name = fct_lump_n(
+          f = !!sym("country_name"),
+          n = 4,
+          w = !!sym("trade_value_usd_imp"),
+          other_level = "Rest of the world"
+        )) %>%
         group_by(!!sym("country_name")) %>%
         summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
-        mutate(country_name = factor(!!sym("country_name"), 
-                                     levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")))
+        mutate(country_name = factor(!!sym("country_name"),
+          levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
+        ))
 
       hchart(d, "column", hcaes(x = "country_name", y = "trade_value_usd_imp"),
-             color = "#85cca6",
-             tooltip = list(pointFormatter = custom_tooltip_short())) %>%
+        color = "#85cca6",
+        tooltip = list(pointFormatter = custom_tooltip_short())
+      ) %>%
         hc_xAxis(title = list(text = "Country")) %>%
-        hc_yAxis(title = list(text = "USD billion"),
-                 labels = list(formatter = JS("function() { return this.value / 1000000000 }"))) %>%
+        hc_yAxis(
+          title = list(text = "USD billion"),
+          labels = list(formatter = JS("function() { return this.value / 1000000000 }"))
+        ) %>%
         hc_title(text = exp_col_min_yr_usd_tt())
     }) %>%
       bindCache(inp_y(), inp_s(), inp_d()) %>%
@@ -550,19 +541,23 @@ mod_products_server <- function(id) {
         group_by(!!sym("country_name")) %>%
         summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
         filter(!!sym("trade_value_usd_imp") > 0) %>%
-        mutate(country_name = fct_lump_n(f = !!sym("country_name"), 
-                                         n = 4, 
-                                         w = !!sym("trade_value_usd_imp"),
-                                         other_level = "Rest of the world")) %>%
+        mutate(country_name = fct_lump_n(
+          f = !!sym("country_name"),
+          n = 4,
+          w = !!sym("trade_value_usd_imp"),
+          other_level = "Rest of the world"
+        )) %>%
         group_by(!!sym("country_name")) %>%
         summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
         mutate(percentage = round(100 * !!sym("trade_value_usd_imp") / sum(!!sym("trade_value_usd_imp")), 1)) %>%
-        mutate(country_name = factor(!!sym("country_name"), 
-                                     levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")))
+        mutate(country_name = factor(!!sym("country_name"),
+          levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
+        ))
 
       hchart(d, "column", hcaes(x = "country_name", y = "percentage"),
-             color = "#85cca6",
-             tooltip = list(pointFormatter = JS("function() { return this.point.name + ': <b>' + this.y + '%</b>'; }"))) %>%
+        color = "#85cca6",
+        tooltip = list(pointFormatter = JS("function() { return this.point.name + ': <b>' + this.y + '%</b>'; }"))
+      ) %>%
         hc_xAxis(title = list(text = "Country")) %>%
         hc_yAxis(title = list(text = "Percentage (%)")) %>%
         hc_title(text = exp_col_min_yr_pct_tt())
@@ -582,21 +577,27 @@ mod_products_server <- function(id) {
         group_by(!!sym("country_name")) %>%
         summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
         filter(!!sym("trade_value_usd_imp") > 0) %>%
-        mutate(country_name = fct_lump_n(f = !!sym("country_name"), 
-                                         n = 4, 
-                                         w = !!sym("trade_value_usd_imp"),
-                                         other_level = "Rest of the world")) %>%
+        mutate(country_name = fct_lump_n(
+          f = !!sym("country_name"),
+          n = 4,
+          w = !!sym("trade_value_usd_imp"),
+          other_level = "Rest of the world"
+        )) %>%
         group_by(!!sym("country_name")) %>%
         summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
-        mutate(country_name = factor(!!sym("country_name"), 
-                                     levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")))
+        mutate(country_name = factor(!!sym("country_name"),
+          levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
+        ))
 
       hchart(d, "column", hcaes(x = "country_name", y = "trade_value_usd_imp"),
-             color = "#67c090",
-             tooltip = list(pointFormatter = custom_tooltip_short())) %>%
+        color = "#67c090",
+        tooltip = list(pointFormatter = custom_tooltip_short())
+      ) %>%
         hc_xAxis(title = list(text = "Country")) %>%
-        hc_yAxis(title = list(text = "USD billion"),
-                 labels = list(formatter = JS("function() { return this.value / 1000000000 }"))) %>%
+        hc_yAxis(
+          title = list(text = "USD billion"),
+          labels = list(formatter = JS("function() { return this.value / 1000000000 }"))
+        ) %>%
         hc_title(text = exp_col_max_yr_usd_tt())
     }) %>%
       bindCache(inp_y(), inp_s(), inp_d()) %>%
@@ -614,19 +615,23 @@ mod_products_server <- function(id) {
         group_by(!!sym("country_name")) %>%
         summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
         filter(!!sym("trade_value_usd_imp") > 0) %>%
-        mutate(country_name = fct_lump_n(f = !!sym("country_name"), 
-                                         n = 4, 
-                                         w = !!sym("trade_value_usd_imp"),
-                                         other_level = "Rest of the world")) %>%
+        mutate(country_name = fct_lump_n(
+          f = !!sym("country_name"),
+          n = 4,
+          w = !!sym("trade_value_usd_imp"),
+          other_level = "Rest of the world"
+        )) %>%
         group_by(!!sym("country_name")) %>%
         summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
         mutate(percentage = round(100 * !!sym("trade_value_usd_imp") / sum(!!sym("trade_value_usd_imp")), 1)) %>%
-        mutate(country_name = factor(!!sym("country_name"), 
-                                     levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")))
+        mutate(country_name = factor(!!sym("country_name"),
+          levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
+        ))
 
       hchart(d, "column", hcaes(x = "country_name", y = "percentage"),
-             color = "#67c090",
-             tooltip = list(pointFormatter = JS("function() { return this.point.name + ': <b>' + this.y + '%</b>'; }"))) %>%
+        color = "#67c090",
+        tooltip = list(pointFormatter = JS("function() { return this.point.name + ': <b>' + this.y + '%</b>'; }"))
+      ) %>%
         hc_xAxis(title = list(text = "Country")) %>%
         hc_yAxis(title = list(text = "Percentage (%)")) %>%
         hc_title(text = exp_col_max_yr_pct_tt())
@@ -652,13 +657,13 @@ mod_products_server <- function(id) {
             collect(),
           by = c("partner_iso" = "country_iso")
         )
-      
+
       # Create continent colors dataset
       d2 <- d %>%
         select(!!sym("continent_name"), country_color = !!sym("continent_color")) %>%
         distinct() %>%
         arrange(!!sym("continent_name"))
-      
+
       wt$inc(1)
 
       od_to_highcharts(d, d2)
@@ -684,13 +689,13 @@ mod_products_server <- function(id) {
             collect(),
           by = c("partner_iso" = "country_iso")
         )
-      
+
       # Create continent colors dataset
       d2 <- d %>%
         select(!!sym("continent_name"), country_color = !!sym("continent_color")) %>%
         distinct() %>%
         arrange(!!sym("continent_name"))
-      
+
       wt$inc(1)
 
       od_to_highcharts(d, d2)
@@ -710,15 +715,15 @@ mod_products_server <- function(id) {
     imp_col_min_yr_usd_tt <- eventReactive(input$go, {
       glue("Imports in { min(inp_y()) } (USD)")
     })
-    
+
     imp_col_min_yr_pct_tt <- eventReactive(input$go, {
       glue("Imports in { min(inp_y()) } (%)")
     })
-    
+
     imp_col_max_yr_usd_tt <- eventReactive(input$go, {
       glue("Imports in { max(inp_y()) } (USD)")
     })
-    
+
     imp_col_max_yr_pct_tt <- eventReactive(input$go, {
       glue("Imports in { max(inp_y()) } (%)")
     })
@@ -737,21 +742,27 @@ mod_products_server <- function(id) {
         group_by(!!sym("country_name")) %>%
         summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
         filter(!!sym("trade_value_usd_exp") > 0) %>%
-        mutate(country_name = fct_lump_n(f = !!sym("country_name"), 
-                                         n = 4, 
-                                         w = !!sym("trade_value_usd_exp"),
-                                         other_level = "Rest of the world")) %>%
+        mutate(country_name = fct_lump_n(
+          f = !!sym("country_name"),
+          n = 4,
+          w = !!sym("trade_value_usd_exp"),
+          other_level = "Rest of the world"
+        )) %>%
         group_by(!!sym("country_name")) %>%
         summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
-        mutate(country_name = factor(!!sym("country_name"), 
-                                     levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")))
+        mutate(country_name = factor(!!sym("country_name"),
+          levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
+        ))
 
       hchart(d, "column", hcaes(x = "country_name", y = "trade_value_usd_exp"),
-             color = "#518498",
-             tooltip = list(pointFormatter = custom_tooltip_short())) %>%
+        color = "#518498",
+        tooltip = list(pointFormatter = custom_tooltip_short())
+      ) %>%
         hc_xAxis(title = list(text = "Country")) %>%
-        hc_yAxis(title = list(text = "USD billion"),
-                 labels = list(formatter = JS("function() { return this.value / 1000000000 }"))) %>%
+        hc_yAxis(
+          title = list(text = "USD billion"),
+          labels = list(formatter = JS("function() { return this.value / 1000000000 }"))
+        ) %>%
         hc_title(text = imp_col_min_yr_usd_tt())
     }) %>%
       bindCache(inp_y(), inp_s(), inp_d()) %>%
@@ -769,19 +780,23 @@ mod_products_server <- function(id) {
         group_by(!!sym("country_name")) %>%
         summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
         filter(!!sym("trade_value_usd_exp") > 0) %>%
-        mutate(country_name = fct_lump_n(f = !!sym("country_name"), 
-                                         n = 4, 
-                                         w = !!sym("trade_value_usd_exp"),
-                                         other_level = "Rest of the world")) %>%
+        mutate(country_name = fct_lump_n(
+          f = !!sym("country_name"),
+          n = 4,
+          w = !!sym("trade_value_usd_exp"),
+          other_level = "Rest of the world"
+        )) %>%
         group_by(!!sym("country_name")) %>%
         summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
         mutate(percentage = round(100 * !!sym("trade_value_usd_exp") / sum(!!sym("trade_value_usd_exp")), 1)) %>%
-        mutate(country_name = factor(!!sym("country_name"), 
-                                     levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")))
+        mutate(country_name = factor(!!sym("country_name"),
+          levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
+        ))
 
       hchart(d, "column", hcaes(x = "country_name", y = "percentage"),
-             color = "#518498",
-             tooltip = list(pointFormatter = JS("function() { return this.point.name + ': <b>' + this.y + '%</b>'; }"))) %>%
+        color = "#518498",
+        tooltip = list(pointFormatter = JS("function() { return this.point.name + ': <b>' + this.y + '%</b>'; }"))
+      ) %>%
         hc_xAxis(title = list(text = "Country")) %>%
         hc_yAxis(title = list(text = "Percentage (%)")) %>%
         hc_title(text = imp_col_min_yr_pct_tt())
@@ -801,21 +816,27 @@ mod_products_server <- function(id) {
         group_by(!!sym("country_name")) %>%
         summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
         filter(!!sym("trade_value_usd_exp") > 0) %>%
-        mutate(country_name = fct_lump_n(f = !!sym("country_name"), 
-                                         n = 4, 
-                                         w = !!sym("trade_value_usd_exp"),
-                                         other_level = "Rest of the world")) %>%
+        mutate(country_name = fct_lump_n(
+          f = !!sym("country_name"),
+          n = 4,
+          w = !!sym("trade_value_usd_exp"),
+          other_level = "Rest of the world"
+        )) %>%
         group_by(!!sym("country_name")) %>%
         summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
-        mutate(country_name = factor(!!sym("country_name"), 
-                                     levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")))
+        mutate(country_name = factor(!!sym("country_name"),
+          levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
+        ))
 
       hchart(d, "column", hcaes(x = "country_name", y = "trade_value_usd_exp"),
-             color = "#26667f",
-             tooltip = list(pointFormatter = custom_tooltip_short())) %>%
+        color = "#26667f",
+        tooltip = list(pointFormatter = custom_tooltip_short())
+      ) %>%
         hc_xAxis(title = list(text = "Country")) %>%
-        hc_yAxis(title = list(text = "USD billion"),
-                 labels = list(formatter = JS("function() { return this.value / 1000000000 }"))) %>%
+        hc_yAxis(
+          title = list(text = "USD billion"),
+          labels = list(formatter = JS("function() { return this.value / 1000000000 }"))
+        ) %>%
         hc_title(text = imp_col_max_yr_usd_tt())
     }) %>%
       bindCache(inp_y(), inp_s(), inp_d()) %>%
@@ -833,19 +854,23 @@ mod_products_server <- function(id) {
         group_by(!!sym("country_name")) %>%
         summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
         filter(!!sym("trade_value_usd_exp") > 0) %>%
-        mutate(country_name = fct_lump_n(f = !!sym("country_name"), 
-                                         n = 4, 
-                                         w = !!sym("trade_value_usd_exp"),
-                                         other_level = "Rest of the world")) %>%
+        mutate(country_name = fct_lump_n(
+          f = !!sym("country_name"),
+          n = 4,
+          w = !!sym("trade_value_usd_exp"),
+          other_level = "Rest of the world"
+        )) %>%
         group_by(!!sym("country_name")) %>%
         summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
         mutate(percentage = round(100 * !!sym("trade_value_usd_exp") / sum(!!sym("trade_value_usd_exp")), 1)) %>%
-        mutate(country_name = factor(!!sym("country_name"), 
-                                     levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")))
+        mutate(country_name = factor(!!sym("country_name"),
+          levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
+        ))
 
       hchart(d, "column", hcaes(x = "country_name", y = "percentage"),
-             color = "#26667f",
-             tooltip = list(pointFormatter = JS("function() { return this.point.name + ': <b>' + this.y + '%</b>'; }"))) %>%
+        color = "#26667f",
+        tooltip = list(pointFormatter = JS("function() { return this.point.name + ': <b>' + this.y + '%</b>'; }"))
+      ) %>%
         hc_xAxis(title = list(text = "Country")) %>%
         hc_yAxis(title = list(text = "Percentage (%)")) %>%
         hc_title(text = imp_col_max_yr_pct_tt())
@@ -871,13 +896,13 @@ mod_products_server <- function(id) {
             collect(),
           by = c("partner_iso" = "country_iso")
         )
-      
+
       # Create continent colors dataset
       d2 <- d %>%
         select(!!sym("continent_name"), country_color = !!sym("continent_color")) %>%
         distinct() %>%
         arrange(!!sym("continent_name"))
-      
+
       wt$inc(1)
 
       od_to_highcharts(d, d2)
@@ -903,13 +928,13 @@ mod_products_server <- function(id) {
             collect(),
           by = c("partner_iso" = "country_iso")
         )
-      
+
       # Create continent colors dataset
       d2 <- d %>%
         select(!!sym("continent_name"), country_color = !!sym("continent_color")) %>%
         distinct() %>%
         arrange(!!sym("continent_name"))
-      
+
       wt$inc(1)
 
       out <- od_to_highcharts(d, d2)
@@ -926,72 +951,108 @@ mod_products_server <- function(id) {
 
     ## Titles / texts ----
 
-    output$title <- renderText({ title() })
+    output$title <- renderText({
+      title()
+    })
 
     ## Dynamic / server side selectors ----
 
     updateSelectizeInput(session, "s",
-                         choices = list(
-                           "HS Sections" = tradestatisticsshiny::sections_display,
-                           "HS Commodities" = tradestatisticsshiny::commodities_short_display
-                         ),
-                         selected = "01",
-                         server = TRUE
+      choices = list(
+        "HS Sections" = tradestatisticsshiny::sections_display,
+        "HS Commodities" = tradestatisticsshiny::commodities_short_display
+      ),
+      selected = "01",
+      server = TRUE
     )
 
     ## Product profile ----
 
     ### Trade ----
 
-    output$trd_stl <- eventReactive(input$go, { "Total multilateral Exports and Imports" })
+    output$trd_stl <- eventReactive(input$go, {
+      "Total multilateral Exports and Imports"
+    })
 
-    output$trd_stl_exp <- eventReactive(input$go, { "Exports" })
-    output$trd_stl_imp <- eventReactive(input$go, { "Imports" })
+    output$trd_stl_exp <- eventReactive(input$go, {
+      "Exports"
+    })
+    output$trd_stl_imp <- eventReactive(input$go, {
+      "Imports"
+    })
 
     output$trd_smr_exp <- renderText(trd_smr_txt_exp())
     output$trd_smr_imp <- renderText(trd_smr_txt_imp())
 
-    output$trd_exc_columns_agg <- renderHighchart({ trd_exc_columns_agg() })
+    output$trd_exc_columns_agg <- renderHighchart({
+      trd_exc_columns_agg()
+    })
 
     # ### Exports ----
 
     output$exp_tt_yr <- renderText(exp_tt_yr())
-    
+
     output$exp_col_min_yr_usd_tt <- renderText(exp_col_min_yr_usd_tt())
-    output$exp_col_min_yr_usd <- renderHighchart({exp_col_min_yr_usd()})
+    output$exp_col_min_yr_usd <- renderHighchart({
+      exp_col_min_yr_usd()
+    })
     output$exp_col_min_yr_pct_tt <- renderText(exp_col_min_yr_pct_tt())
-    output$exp_col_min_yr_pct <- renderHighchart({exp_col_min_yr_pct()})
+    output$exp_col_min_yr_pct <- renderHighchart({
+      exp_col_min_yr_pct()
+    })
     output$exp_col_max_yr_usd_tt <- renderText(exp_col_max_yr_usd_tt())
-    output$exp_col_max_yr_usd <- renderHighchart({exp_col_max_yr_usd()})
+    output$exp_col_max_yr_usd <- renderHighchart({
+      exp_col_max_yr_usd()
+    })
     output$exp_col_max_yr_pct_tt <- renderText(exp_col_max_yr_pct_tt())
-    output$exp_col_max_yr_pct <- renderHighchart({exp_col_max_yr_pct()})
-    
+    output$exp_col_max_yr_pct <- renderHighchart({
+      exp_col_max_yr_pct()
+    })
+
     output$exp_tt_min_yr <- renderText(exp_tt_min_yr())
-    output$exp_tm_dtl_min_yr <- renderHighchart({exp_tm_dtl_min_yr()})
+    output$exp_tm_dtl_min_yr <- renderHighchart({
+      exp_tm_dtl_min_yr()
+    })
     output$exp_tt_max_yr <- renderText(exp_tt_max_yr())
-    output$exp_tm_dtl_max_yr <- renderHighchart({exp_tm_dtl_max_yr()})
+    output$exp_tm_dtl_max_yr <- renderHighchart({
+      exp_tm_dtl_max_yr()
+    })
 
     # ### Imports ----
 
     output$imp_tt_yr <- renderText(imp_tt_yr())
-    
+
     output$imp_col_min_yr_usd_tt <- renderText(imp_col_min_yr_usd_tt())
-    output$imp_col_min_yr_usd <- renderHighchart({imp_col_min_yr_usd()})
+    output$imp_col_min_yr_usd <- renderHighchart({
+      imp_col_min_yr_usd()
+    })
     output$imp_col_min_yr_pct_tt <- renderText(imp_col_min_yr_pct_tt())
-    output$imp_col_min_yr_pct <- renderHighchart({imp_col_min_yr_pct()})
+    output$imp_col_min_yr_pct <- renderHighchart({
+      imp_col_min_yr_pct()
+    })
     output$imp_col_max_yr_usd_tt <- renderText(imp_col_max_yr_usd_tt())
-    output$imp_col_max_yr_usd <- renderHighchart({imp_col_max_yr_usd()})
+    output$imp_col_max_yr_usd <- renderHighchart({
+      imp_col_max_yr_usd()
+    })
     output$imp_col_max_yr_pct_tt <- renderText(imp_col_max_yr_pct_tt())
-    output$imp_col_max_yr_pct <- renderHighchart({imp_col_max_yr_pct()})
-    
+    output$imp_col_max_yr_pct <- renderHighchart({
+      imp_col_max_yr_pct()
+    })
+
     output$imp_tt_min_yr <- renderText(imp_tt_min_yr())
-    output$imp_tm_dtl_min_yr <- renderHighchart({imp_tm_dtl_min_yr()})
+    output$imp_tm_dtl_min_yr <- renderHighchart({
+      imp_tm_dtl_min_yr()
+    })
     output$imp_tt_max_yr <- renderText(imp_tt_max_yr())
-    output$imp_tm_dtl_max_yr <- renderHighchart({imp_tm_dtl_max_yr()})
+    output$imp_tm_dtl_max_yr <- renderHighchart({
+      imp_tm_dtl_max_yr()
+    })
 
     ## Download ----
 
-    dwn_stl <- eventReactive(input$go, { "Download product data" })
+    dwn_stl <- eventReactive(input$go, {
+      "Download product data"
+    })
 
     dwn_txt <- eventReactive(input$go, {
       "Select the correct format for your favourite language or software of choice. The dashboard can export to CSV/TSV/XLSX for Excel or any other software, but also to SAV (SPSS) and DTA (Stata)."
@@ -1016,13 +1077,19 @@ mod_products_server <- function(id) {
       }
     )
 
-    output$dwn_stl <- renderText({ dwn_stl() })
-    output$dwn_txt <- renderText({ dwn_txt() })
-    output$dwn_fmt <- renderUI({ dwn_fmt() })
+    output$dwn_stl <- renderText({
+      dwn_stl()
+    })
+    output$dwn_txt <- renderText({
+      dwn_txt()
+    })
+    output$dwn_fmt <- renderUI({
+      dwn_fmt()
+    })
 
     output$dwn_dtl <- renderUI({
       req(input$go)
-      downloadButton(ns('dwn_dtl_pre'), label = 'Detailed data')
+      downloadButton(ns("dwn_dtl_pre"), label = "Detailed data")
     })
 
     ## Additional outputs can be added here

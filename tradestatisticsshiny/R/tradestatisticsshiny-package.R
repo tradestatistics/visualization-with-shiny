@@ -1,6 +1,31 @@
 #' @keywords internal
 #' @importFrom cachem cache_disk
 #' @importFrom shiny shinyOptions
+#' @importFrom dplyr arrange bind_rows case_when coalesce collect dense_rank desc
+#'     distinct everything filter group_by inner_join last left_join mutate mutate_if
+#'     pull rename select slice_head summarise tbl tibble ungroup
+#' @importFrom forcats fct_lump_n
+#' @importFrom glue glue
+#' @importFrom golem add_resource_path activate_js favicon bundle_resources with_golem_options
+#' @importFrom highcharter hcaes hchart hc_title hc_xAxis hc_yAxis JS renderHighchart
+#'     hc_legend highchartOutput data_to_hierarchical
+#' @importFrom jsonlite toJSON
+#' @importFrom lubridate day year
+#' @importFrom magrittr %>%
+#' @importFrom pool dbPool dbIsValid poolClose
+#' @importFrom purrr map_df
+#' @importFrom rio export
+#' @importFrom rlang sym
+#' @importFrom RPostgres Postgres
+#' @importFrom shiny NS tagList HTML fluidRow selectInput sliderInput actionButton
+#'     htmlOutput uiOutput h2 tags div moduleServer reactive eventReactive observe
+#'     observeEvent renderText renderUI updateSelectizeInput downloadHandler req
+#'     shinyApp
+#' @importFrom shinyhelper helper observe_helpers
+#' @importFrom shinyjs hide show useShinyjs
+#' @importFrom stats setNames
+#' @importFrom tidyr pivot_longer
+#' @importFrom waiter Waitress useWaitress
 "_PACKAGE"
 
 styles <- list(
@@ -28,23 +53,24 @@ gdp_deflator_adjustment <- function(d, reference_year, con) {
     distinct(!!sym("year")) %>%
     pull()
 
+  # Get all deflator data once to avoid multiple queries
+  deflator_data <- tbl(con, "gdp_deflator") %>%
+    filter(!!sym("country_iso") == "ALL") %>%
+    collect()
+
   dd <- map_df(
     years,
     function(year) {
       if (year < reference_year) {
-        tbl(con, "gdp_deflator") %>%
+        deflator_data %>%
           filter(!!sym("year_to") <= reference_year &
-            !!sym("year_to") > !!sym("year_from") &
-            !!sym("country_iso") == "all") %>%
-          collect() %>%
+            !!sym("year_to") > !!sym("year_from")) %>%
           summarise(gdp_deflator = last(cumprod(!!sym("gdp_deflator")))) %>%
           mutate(year = year, conversion_year = reference_year)
       } else if (year > reference_year) {
-        tbl(con, "gdp_deflator") %>%
+        deflator_data %>%
           filter(!!sym("year_from") >= reference_year &
-            !!sym("year_to") > !!sym("year_from") &
-            !!sym("country_iso") == "all") %>%
-          collect() %>%
+            !!sym("year_to") > !!sym("year_from")) %>%
           summarise(gdp_deflator = 1 / last(cumprod(!!sym("gdp_deflator")))) %>%
           mutate(year = year, conversion_year = reference_year)
       } else if (year == reference_year) {

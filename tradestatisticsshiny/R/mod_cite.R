@@ -5,8 +5,6 @@
 #' @param id,input,output,session Internal parameters for {shiny}.
 #'
 #' @noRd
-#' @importFrom jsonlite toJSON
-#' @importFrom shiny NS tagList uiOutput moduleServer renderUI HTML tags
 mod_cite_ui <- function(id) {
   ns <- NS(id)
   # Static metadata for the dashboard so reference managers (Zotero) can detect it
