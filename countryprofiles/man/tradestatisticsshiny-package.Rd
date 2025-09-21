@@ -4,9 +4,9 @@
 \name{tradestatisticsshiny-package}
 \alias{tradestatisticsshiny}
 \alias{tradestatisticsshiny-package}
-\title{tradestatisticsshiny: Open Trade Statistics Country App}
+\title{tradestatisticsshiny: Open Trade Statistics Dashboard}
 \description{
-Production grade Shiny app to display the country profiles for tradestatistics.io.
+This is meant as a production grade Shiny app and not as end user app.
 }
 \seealso{
 Useful links:
@@ -17,7 +17,7 @@ Useful links:
 
 }
 \author{
-\strong{Maintainer}: Mauricio Vargas \email{m.vargas.sepulveda@gmail.com}
+\strong{Maintainer}: Mauricio Vargas \email{mavargas11@uc.cl} (\href{https://orcid.org/0000-0003-1017-7574}{ORCID}) [copyright holder]
 
 }
 \keyword{internal}

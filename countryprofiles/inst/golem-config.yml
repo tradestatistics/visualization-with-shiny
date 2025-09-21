@@ -5,4 +5,4 @@ default:
 production:
   app_prod: yes
 dev:
-  golem_wd: !expr here::here()
+  golem_wd: !expr golem::pkg_path()
