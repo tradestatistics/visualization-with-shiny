@@ -172,13 +172,11 @@ mod_countries_server <- function(id) {
 
     # Connect to SQL ----
     con <- sql_con()
-  
-    onStop(function() {
-      poolClose(con)
-    })
     
     session$onSessionEnded(function() {
-      poolClose(con)
+      if (!is.null(con) && dbIsValid(con)) {
+        poolClose(con)
+      }
     })
 
     # User inputs ----
