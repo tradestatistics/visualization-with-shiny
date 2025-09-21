@@ -7,7 +7,7 @@
 show_percentage(x)
 }
 \arguments{
-\item{x}{inout number}
+\item{x}{input number}
 }
 \description{
 Format for Percentages

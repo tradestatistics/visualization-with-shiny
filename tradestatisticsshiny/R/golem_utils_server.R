@@ -1,5 +1,4 @@
 #' Available Server parameters expressed as functions
-#' @export
 available_formats <- function() {
   c("csv", "tsv", "xlsx", "sav", "dta")
 }
@@ -7,7 +6,6 @@ available_formats <- function() {
 #' SQL connection
 #' @importFrom pool dbPool dbIsValid poolClose 
 #' @importFrom RPostgres Postgres
-#' @export
 sql_con <- function() {
   dbPool(
     drv = Postgres(),
@@ -54,14 +52,12 @@ lvl_opts <- list(
 
 #' Custom Tooltip (For Highcharter Visuals)
 #' @importFrom highcharter JS
-#' @export
 custom_tooltip <- function() {
   JS("function() {\n                var raw = (this.point && this.point.raw_value != null) ? this.point.raw_value : this.value;\n                return '<b>' + this.name + '</b>' + '<br>' +\n                       'Share: ' + Math.round(raw / this.series.tree.val * 10000)/100 + '%' + '<br>' +\n                       'Value: ' + Highcharts.numberFormat(raw, 0) + ' USD'\n                       }")
 }
 
 #' Custom Short Tooltip (For Highcharter Visuals)
 #' @importFrom highcharter JS
-#' @export
 custom_tooltip_short <- function() {
   JS("function() { return '<b>' + this.series.name + '</b>' + ' ' +
      Highcharts.numberFormat(this.y, 0) + ' USD' }")
@@ -69,7 +65,6 @@ custom_tooltip_short <- function() {
 
 #' Custom Data Labels (For Highcharter Visuals)
 #' @importFrom highcharter JS
-#' @export
 data_labels <- function() {
   JS("function() { return this.key + '<br>' + Math.round(this.point.value / this.point.series.tree.val * 10000 ) / 100 + '%'}")
 }
@@ -79,7 +74,6 @@ data_labels <- function() {
 #' @param d2 input dataset for colours
 #' @importFrom dplyr arrange desc distinct group_by mutate pull summarise ungroup
 #' @importFrom highcharter data_to_hierarchical hchart
-#' @export
 od_to_highcharts <- function(d, d2) {
   dd <- d %>%
     mutate(continent_name = factor(!!sym("continent_name"), levels = d2$continent_name)) %>%
@@ -130,7 +124,6 @@ od_to_highcharts <- function(d, d2) {
 #'     select summarise ungroup
 #' @importFrom purrr map_df
 #' @importFrom rlang sym
-#' @export
 p_aggregate_by_section <- function(d, col, con) {
   d <- d %>%
     select(!!sym("commodity_code"), !!sym("section_code"), !!sym(col)) %>%
@@ -169,13 +162,11 @@ p_aggregate_by_section <- function(d, col, con) {
 #' Colorize Products (For Highcharter Visuals)
 #' @param d input dataset
 #' @param con SQL connection
-#' @importFrom dplyr collect distinct inner_join select tbl
+#' @importFrom dplyr collect distinct inner_join tbl
 #' @importFrom rlang sym
-#' @export
 p_colors <- function(d, con) {
   d %>%
-    select(!!sym("section_name")) %>%
-    distinct() %>%
+    distinct(!!sym("section_name")) %>%
     inner_join(
       tbl(con, "commodities") %>%
         select(
@@ -184,7 +175,8 @@ p_colors <- function(d, con) {
           !!sym("section_color")
         ) %>%
         distinct() %>%
-        collect()
+        collect(),
+      by = "section_name"
     )
 }
 
@@ -193,7 +185,6 @@ p_colors <- function(d, con) {
 #' @param con SQL connection
 #' @importFrom dplyr collect filter group_by left_join mutate select
 #'     summarise tbl ungroup
-#' @export
 p_aggregate_products <- function(d, con) {
   d %>%
     inner_join(
@@ -202,7 +193,8 @@ p_aggregate_products <- function(d, con) {
           !!sym("commodity_code"), !!sym("commodity_code_short"), !!sym("section_code"),
           !!sym("section_color"), !!sym("section_name")
         ) %>%
-        collect()
+        collect(),
+        by = c("commodity_code", "section_code")
     ) %>%
     group_by(
       !!sym("commodity_code"), !!sym("commodity_code_short"), !!sym("section_code"),
@@ -225,7 +217,6 @@ p_aggregate_products <- function(d, con) {
 #' @param d2 input dataset for colours
 #' @importFrom dplyr arrange desc distinct group_by mutate_if pull summarise ungroup
 #' @importFrom highcharter data_to_hierarchical hchart
-#' @export
 p_to_highcharts <- function(d, d2) {
   dd <- d %>%
     mutate(section_name = factor(!!sym("section_name"), levels = d2$section_name)) %>%
@@ -269,10 +260,15 @@ p_to_highcharts <- function(d, d2) {
       formatter = data_labels()
     )
   )
-} # Small grammar helpers used by glue templates in the app_server
-# These used to live in the app namespace; define safe fallbacks here so
-# glues don't fail when the functions are referenced during rendering.
-#' @export
+}
+
+#' Add definite article for reporter names
+#'
+#' Grammar helper function that adds "the" for reporter names that typically
+#' take the definite article (e.g., "United States", "Russian Federation").
+#'
+#' @param name Character string of the reporter name
+#' @return Character string: "the" for names requiring the article, empty string otherwise
 r_add_the <- function(name = NULL) {
   # Return 'the' for reporter names that typically take the article
   if (is.null(name)) {
@@ -284,7 +280,13 @@ r_add_the <- function(name = NULL) {
   ""
 }
 
-#' @export
+#' Add capitalized definite article for reporter names
+#'
+#' Grammar helper function that adds "The" (capitalized) for reporter names that
+#' typically take the definite article, used at the beginning of sentences.
+#'
+#' @param name Character string of the reporter name
+#' @return Character string: "The" for names requiring the article, empty string otherwise
 r_add_upp_the <- function(name = NULL) {
   v <- r_add_the(name)
   if (nchar(v) == 0) {
@@ -294,7 +296,13 @@ r_add_upp_the <- function(name = NULL) {
   paste0(toupper(substr(v, 1, 1)), tolower(substr(v, 2, nchar(v))))
 }
 
-#' @export
+#' Add definite article for partner names
+#'
+#' Grammar helper function that adds "the" for partner names that typically
+#' take the definite article (e.g., "United States", "Russian Federation").
+#'
+#' @param name Character string of the partner name
+#' @return Character string: "the" for names requiring the article, empty string otherwise
 p_add_the <- function(name = NULL) {
   # same logic for partner names
   if (is.null(name)) {
@@ -310,7 +318,6 @@ p_add_the <- function(name = NULL) {
 
 #' Format for Dollars
 #' @param x input number
-#' @export
 show_dollars <- function(x) {
   ifelse(x %/% 10e8 >= 1,
     paste0(round(x / 10e8, 2), "B"),
@@ -319,8 +326,7 @@ show_dollars <- function(x) {
 }
 
 #' Format for Percentages
-#' @param x inout number
-#' @export
+#' @param x input number
 show_percentage <- function(x) {
   paste0(round(100 * x, 2), "%")
 }
@@ -329,7 +335,6 @@ show_percentage <- function(x) {
 #' @param p final value
 #' @param q initial value
 #' @param t time period
-#' @export
 growth_rate <- function(p, q, t) {
   (p / q)^(1 / (max(t) - min(t))) - 1
 }
@@ -337,9 +342,7 @@ growth_rate <- function(p, q, t) {
 #' Typing reactiveValues is too long
 #' @param ... elements to pass to the function
 #' @rdname reactives
-#' @export
 rv <- function(...) shiny::reactiveValues(...)
 
 #' @rdname reactives
-#' @export
 rvtl <- function(...) shiny::reactiveValuesToList(...)

@@ -5,7 +5,7 @@
 #' @param id,input,output,session Internal parameters for {shiny}.
 #'
 #' @noRd
-#'
+#' @importFrom jsonlite toJSON
 #' @importFrom shiny NS tagList uiOutput moduleServer renderUI HTML tags
 mod_cite_ui <- function(id) {
   ns <- NS(id)
@@ -21,7 +21,7 @@ mod_cite_ui <- function(id) {
       tags$meta(name = "citation_publisher", content = "Open Trade Statistics"),
       tags$meta(name = "citation_abstract", content = "Interactive dashboard presenting UN Comtrade Plus based trade statistics."),
       tags$script(type = "application/ld+json", HTML(
-        jsonlite::toJSON(list(
+        toJSON(list(
           "@context" = "http://schema.org",
           "@type" = "SoftwareApplication",
           name = "Open Trade Statistics Beta Dashboard",
@@ -58,7 +58,7 @@ mod_cite_server <- function(id) {
       HTML(
         glue::glue(
           "{author_name_display}. \"OTS BETA DASHBOARD\". <i>Open Trade Statistics</i>.
-        Accessed {format(Sys.Date(), '%B %d, %Y')} — {site_url}"
+        Accessed {format(Sys.Date(), '%B %d, %Y')} \u2014 {site_url}"
         )
       )
     })

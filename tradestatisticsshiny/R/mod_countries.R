@@ -35,8 +35,8 @@ mod_countries_ui <- function(id) {
         selectInput(
           ns("r"),
           "Reporter",
-          choices = sort(available_reporters_iso()[
-            available_reporters_iso() != "ALL"
+          choices = sort(tradestatisticsshiny::reporters_display[
+            tradestatisticsshiny::reporters_display != "ALL"
           ]),
           selected = "GBR",
           selectize = TRUE,
@@ -49,7 +49,7 @@ mod_countries_ui <- function(id) {
           "Partner",
           choices = c(
             "All countries" = "ALL",
-            sort(available_reporters_iso()[available_reporters_iso() != "ALL"])
+            sort(tradestatisticsshiny::reporters_display[tradestatisticsshiny::reporters_display != "ALL"])
           ),
           selected = "ALL",
           selectize = TRUE,
@@ -194,6 +194,7 @@ mod_countries_ui <- function(id) {
 #' @importFrom rlang sym
 #' @importFrom shinyhelper observe_helpers
 #' @importFrom shinyjs hide show
+#' @importFrom stats setNames
 #' @importFrom tidyr pivot_longer
 #' @importFrom waiter Waitress
 mod_countries_server <- function(id) {
@@ -240,7 +241,7 @@ mod_countries_server <- function(id) {
     # Human-readable reporter/partner names for glue templates. Fallback to
     # the code when no display name is available.
     rname <- eventReactive(input$go, {
-      out <- names(available_reporters_iso()[available_reporters_iso() == inp_r()])
+      out <- names(tradestatisticsshiny::reporters_display[tradestatisticsshiny::reporters_display == inp_r()])
       if (length(out) == 0 || is.na(out) || nchar(out) == 0) {
         return(inp_r())
       }
@@ -248,7 +249,7 @@ mod_countries_server <- function(id) {
     })
 
     pname <- eventReactive(input$go, {
-      out <- names(available_reporters_iso()[available_reporters_iso() == inp_p()])
+      out <- names(tradestatisticsshiny::reporters_display[tradestatisticsshiny::reporters_display == inp_p()])
       if (length(out) == 0 || is.na(out) || nchar(out) == 0) {
         return(inp_p())
       }
@@ -1125,14 +1126,14 @@ mod_countries_server <- function(id) {
       # compute exchange (exports + imports) by section across selected years
       totals <- df_dtl() %>%
         filter(year %in% !!inp_y()) %>%
-        group_by(section_code, section_name, section_color) %>%
-        summarise(exchange = sum(trade_value_usd_exp + trade_value_usd_imp, na.rm = TRUE), .groups = "drop") %>%
-        arrange(desc(exchange))
+        group_by(!!sym("section_code"), !!sym("section_name"), !!sym("section_color")) %>%
+        summarise(exchange = sum(!!sym("trade_value_usd_exp") + !!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+        arrange(desc(!!sym("exchange")))
 
       # top 9 codes by exchange
       top9 <- totals %>% slice_head(n = 9)
 
-      out <- top9 %>% select(section_code, section_name, section_color)
+      out <- top9 %>% select(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"))
       # append canonical 'Other products' at the end
       out <- bind_rows(out, tibble(section_code = "other", section_name = "Other products", section_color = "#434348"))
       out
@@ -1146,13 +1147,13 @@ mod_countries_server <- function(id) {
 
       d <- df_dtl() %>%
         filter(year == !!yr) %>%
-        group_by(section_code) %>%
+        group_by(!!sym("section_code")) %>%
         summarise(
-          trade_exp = sum(trade_value_usd_exp, na.rm = TRUE),
-          trade_imp = sum(trade_value_usd_imp, na.rm = TRUE),
+          trade_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE),
+          trade_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
           .groups = "drop"
         ) %>%
-        mutate(exchange = trade_exp + trade_imp)
+        mutate(exchange = !!sym("trade_exp") + !!sym("trade_imp"))
 
       # join canonical mapping (if available) and provide defaults
       cs <- tryCatch(top_sections(), error = function(e) NULL)
@@ -1160,10 +1161,10 @@ mod_countries_server <- function(id) {
         d <- d %>%
           left_join(cs, by = "section_code") %>%
           mutate(
-            section_name = coalesce(section_name, "Other products"),
-            section_color = coalesce(section_color, "#434348")
+            section_name = coalesce(!!sym("section_name"), "Other products"),
+            section_color = coalesce(!!sym("section_color"), "#434348")
           ) %>%
-          select(section_code, section_name, section_color, trade_exp, trade_imp, exchange)
+          select(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("trade_exp"), !!sym("trade_imp"), !!sym("exchange"))
       }
 
       d
@@ -1640,8 +1641,8 @@ mod_countries_server <- function(id) {
 
     observeEvent(input$r, {
       updateSelectizeInput(session, "p",
-        choices = sort(available_reporters_iso()[
-          available_reporters_iso() != input$r
+        choices = sort(tradestatisticsshiny::reporters_display[
+          tradestatisticsshiny::reporters_display != input$r
         ]),
         selected = "ALL",
         server = TRUE

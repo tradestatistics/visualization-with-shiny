@@ -235,14 +235,14 @@ mod_products_server <- function(id) {
       }
       
       if (nchar(s_code) == 2) {
-        s <- names(available_sections_code()[
-          available_sections_code() == s_code])
+        s <- names(tradestatisticsshiny::sections_display[
+          tradestatisticsshiny::sections_display == s_code])
         if (length(s) > 0 && !is.na(s) && nchar(s) > 0) {
           return(gsub(".* - ", "", s))
         }
       } else if (nchar(s_code) == 4) {
-        s <- names(available_commodities_short_code()[
-          available_commodities_short_code() == s_code])
+        s <- names(tradestatisticsshiny::commodities_short_display[
+          tradestatisticsshiny::commodities_short_display == s_code])
         if (length(s) > 0 && !is.na(s) && nchar(s) > 0) {
           return(gsub(".* - ", "", s))
         }
@@ -932,8 +932,8 @@ mod_products_server <- function(id) {
 
     updateSelectizeInput(session, "s",
                          choices = list(
-                           "HS Sections" = available_sections_code(),
-                           "HS Commodities" = available_commodities_short_code()
+                           "HS Sections" = tradestatisticsshiny::sections_display,
+                           "HS Commodities" = tradestatisticsshiny::commodities_short_display
                          ),
                          selected = "01",
                          server = TRUE
