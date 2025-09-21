@@ -19,12 +19,12 @@
 #' @noRd
 app_server <- function(input, output, session) {
   # Modules ----
-  mod_countries_server("countries")
-  mod_products_server("products")
+  mod_countries_server("co")
+  mod_products_server("pr")
   mod_cite_server("cite")
 
   # Hide boxes until viz is ready ----
-  
+
   observeEvent(input$go, {
     if (input$go > 0) {
       show(id = "aggregated_trade")
@@ -48,7 +48,7 @@ app_server <- function(input, output, session) {
     # strip shiny related URL parameters
     rvtl(input)
     setBookmarkExclude(c(
-      "shinyhelper-modal_params", "own", "sidebarCollapsed", "sidebarItemExpanded"
+      "shinyhelper-modal_params", "own", "sidebarCollapsed", "sidebarItemExpanded", "countries-fmt"
     ))
     session$doBookmark()
   })

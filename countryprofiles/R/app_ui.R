@@ -24,8 +24,8 @@ app_ui <- function(request) {
         useWaitress(),
         sidebarMenu(
           menuItem("Welcome", tabName = "welcome"),
-          menuItem("Countries", tabName = "countries"),
-          menuItem("Products", tabName = "products"),
+          menuItem("Countries", tabName = "co"),
+          menuItem("Products", tabName = "pr"),
           menuItem("Cite", tabName = "cite")
         )
       ),
@@ -36,12 +36,12 @@ app_ui <- function(request) {
             mod_welcome_ui("welcome")
           ),
           tabItem(
-            tabName = "countries",
-            mod_countries_ui("countries")
+            tabName = "co",
+            mod_countries_ui("co")
           ),
           tabItem(
-            tabName = "products",
-            mod_products_ui("products")
+            tabName = "pr",
+            mod_products_ui("pr")
           ),
           tabItem(
             tabName = "cite",
