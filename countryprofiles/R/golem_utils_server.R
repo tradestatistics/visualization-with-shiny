@@ -5,7 +5,7 @@ available_formats <- function() {
 }
 
 #' SQL connection
-#' @importFrom pool dbPool poolClose
+#' @importFrom pool dbPool dbIsValid poolClose 
 #' @importFrom RPostgres Postgres
 #' @export
 sql_con <- function() {
