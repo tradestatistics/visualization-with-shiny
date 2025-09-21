@@ -264,10 +264,11 @@ mod_countries_server <- function(id) {
     }
 
     title <- eventReactive(input$go, {
-      switch(tbl_dtl,
-        "yrc" = glue("{ r_add_upp_the(rname()) } { rname() } multilateral trade between { min(inp_y()) } and { max(inp_y()) }"),
-        "yrpc" = glue("{ r_add_upp_the(rname()) } { rname() } and { p_add_the(pname()) } { pname() } trade between { min(inp_y()) } and { max(inp_y()) }")
-      )
+      if (inp_p() == "ALL") {
+        glue("{ r_add_upp_the(rname()) } { rname() } multilateral trade between { min(inp_y()) } and { max(inp_y()) }")
+      } else {
+        glue("{ r_add_upp_the(rname()) } { rname() } and { p_add_the(pname()) } { pname() } trade between { min(inp_y()) } and { max(inp_y()) }")
+      }
     })
 
     # Visualize ----
@@ -445,6 +446,7 @@ mod_countries_server <- function(id) {
     trd_rankings <- eventReactive(input$go, {
       min_max_y <- c(min(inp_y()), max(inp_y()))
 
+      # Always get ALL partners for consistent ranking calculation
       d <- tbl(con, "yrp") %>%
         filter(
           !!sym("year") %in% min_max_y &
@@ -457,55 +459,80 @@ mod_countries_server <- function(id) {
       }
 
       d <- d %>%
-        # filter(!!sym("partner_iso") != "0-unspecified") %>%
+        # Keep all partners including unspecified for accurate share calculation
         mutate(
           trd_value_usd_bal = !!sym("trade_value_usd_exp") + !!sym("trade_value_usd_imp")
         ) %>%
         group_by(!!sym("year")) %>%
         mutate(
           bal_rank = dense_rank(desc(!!sym("trd_value_usd_bal"))),
-          exp_share = !!sym("trade_value_usd_exp") / sum(!!sym("trade_value_usd_exp")),
-          imp_share = !!sym("trade_value_usd_imp") / sum(!!sym("trade_value_usd_imp"))
+          exp_share = !!sym("trade_value_usd_exp") / sum(!!sym("trade_value_usd_exp"), na.rm = TRUE),
+          imp_share = !!sym("trade_value_usd_imp") / sum(!!sym("trade_value_usd_imp"), na.rm = TRUE)
         ) %>%
         ungroup()
 
       return(d)
     })
 
+    # Helper function to get ranking with tie information
+    get_ranking_with_ties <- function(year_val) {
+      if (inp_p() == "ALL") {
+        return("N/A")  # No ranking for multilateral trade
+      }
+      
+      rankings_data <- trd_rankings() %>%
+        filter(!!sym("year") == year_val, !!sym("reporter_iso") == !!inp_r())
+      
+      partner_rank <- rankings_data %>%
+        filter(!!sym("partner_iso") == !!inp_p()) %>%
+        pull(!!sym("bal_rank"))
+      
+      if (length(partner_rank) == 0 || is.na(partner_rank)) {
+        return("N/A")
+      }
+      
+      # Check for ties
+      tied_partners <- rankings_data %>%
+        filter(!!sym("bal_rank") == partner_rank, !!sym("partner_iso") != !!inp_p()) %>%
+        nrow()
+      
+      if (tied_partners > 0) {
+        return(paste0(partner_rank, " (tied with ", tied_partners, " other", 
+                     ifelse(tied_partners == 1, "", "s"), ")"))
+      } else {
+        return(as.character(partner_rank))
+      }
+    }
+
     trd_rankings_no_min_yr <- eventReactive(input$go, {
-      trd_rankings() %>%
-        ungroup() %>%
-        filter(
-          !!sym("year") == min(!!inp_y()),
-          !!sym("reporter_iso") == !!inp_r(),
-          !!sym("partner_iso") == !!inp_p()
-        ) %>%
-        select(!!sym("bal_rank")) %>%
-        as.character()
+      get_ranking_with_ties(min(inp_y()))
     })
 
     trd_rankings_no_max_yr <- eventReactive(input$go, {
-      trd_rankings() %>%
-        ungroup() %>%
-        filter(
-          !!sym("year") == max(!!inp_y()),
-          !!sym("reporter_iso") == !!inp_r(),
-          !!sym("partner_iso") == !!inp_p()
-        ) %>%
-        select(!!sym("bal_rank")) %>%
-        as.character()
+      get_ranking_with_ties(max(inp_y()))
     })
 
     trd_rankings_remained <- eventReactive(input$go, {
+      min_rank <- trd_rankings_no_min_yr()
+      max_rank <- trd_rankings_no_max_yr()
+      
+      if (min_rank == "N/A" || max_rank == "N/A") {
+        return("was")
+      }
+      
+      # Extract just the numeric part for comparison (remove tie information)
+      min_rank_num <- as.numeric(gsub(" \\(.*\\)", "", min_rank))
+      max_rank_num <- as.numeric(gsub(" \\(.*\\)", "", max_rank))
+      
       ifelse(
-        trd_rankings_no_min_yr() == trd_rankings_no_max_yr(),
+        min_rank_num == max_rank_num,
         "remained",
         "moved to"
       )
     })
 
     trd_rankings_exp_share_min_yr <- eventReactive(input$go, {
-      trd_rankings() %>%
+      result <- trd_rankings() %>%
         ungroup() %>%
         filter(
           !!sym("year") == min(!!inp_y()),
@@ -514,14 +541,23 @@ mod_countries_server <- function(id) {
         ) %>%
         select(!!sym("exp_share")) %>%
         as.numeric()
+      
+      if (length(result) == 0 || is.na(result)) {
+        return(0)
+      }
+      return(result)
     })
 
     trd_rankings_exp_share_min_yr_2 <- eventReactive(input$go, {
-      show_percentage(trd_rankings_exp_share_min_yr())
+      share_val <- trd_rankings_exp_share_min_yr()
+      if (is.na(share_val) || share_val <= 0) {
+        return("N/A")
+      }
+      show_percentage(share_val)
     })
 
     trd_rankings_exp_share_max_yr <- eventReactive(input$go, {
-      trd_rankings() %>%
+      result <- trd_rankings() %>%
         ungroup() %>%
         filter(
           !!sym("year") == max(!!inp_y()),
@@ -530,14 +566,23 @@ mod_countries_server <- function(id) {
         ) %>%
         select(!!sym("exp_share")) %>%
         as.numeric()
+      
+      if (length(result) == 0 || is.na(result)) {
+        return(0)
+      }
+      return(result)
     })
 
     trd_rankings_exp_share_max_yr_2 <- eventReactive(input$go, {
-      show_percentage(trd_rankings_exp_share_max_yr())
+      share_val <- trd_rankings_exp_share_max_yr()
+      if (is.na(share_val) || share_val <= 0) {
+        return("N/A")
+      }
+      show_percentage(share_val)
     })
 
     trd_rankings_imp_share_min_yr <- eventReactive(input$go, {
-      trd_rankings() %>%
+      result <- trd_rankings() %>%
         ungroup() %>%
         filter(
           !!sym("year") == min(!!inp_y()),
@@ -546,14 +591,23 @@ mod_countries_server <- function(id) {
         ) %>%
         select(!!sym("imp_share")) %>%
         as.numeric()
+      
+      if (length(result) == 0 || is.na(result)) {
+        return(0)
+      }
+      return(result)
     })
 
     trd_rankings_imp_share_min_yr_2 <- eventReactive(input$go, {
-      show_percentage(trd_rankings_imp_share_min_yr())
+      share_val <- trd_rankings_imp_share_min_yr()
+      if (is.na(share_val) || share_val <= 0) {
+        return("N/A")
+      }
+      show_percentage(share_val)
     })
 
     trd_rankings_imp_share_max_yr <- eventReactive(input$go, {
-      trd_rankings() %>%
+      result <- trd_rankings() %>%
         ungroup() %>%
         filter(
           !!sym("year") == max(!!inp_y()),
@@ -562,51 +616,63 @@ mod_countries_server <- function(id) {
         ) %>%
         select(!!sym("imp_share")) %>%
         as.numeric()
+      
+      if (length(result) == 0 || is.na(result)) {
+        return(0)
+      }
+      return(result)
     })
 
     trd_rankings_imp_share_max_yr_2 <- eventReactive(input$go, {
       wt$inc(1)
 
-      show_percentage(trd_rankings_imp_share_max_yr())
+      share_val <- trd_rankings_imp_share_max_yr()
+      if (is.na(share_val) || share_val <= 0) {
+        return("N/A")
+      }
+      show_percentage(share_val)
     })
 
     ### Text/Visual elements ----
 
     trd_smr_txt_exp <- eventReactive(input$go, {
-      switch(tbl_agg,
-        "yr" = glue("The exports of { r_add_the(rname()) } { rname() } to the World { exports_growth_increase_decrease() } from
+      if (inp_p() == "ALL") {
+        glue("The exports of { r_add_the(rname()) } { rname() } to the World { exports_growth_increase_decrease() } from
                             { exp_val_min_yr_2() } in { min(inp_y()) } to { exp_val_max_yr_2() } in { max(inp_y()) }
-                            (annualized { exports_growth_increase_decrease_2() } of { exports_growth_2() })."),
-        "yrp" = glue("The exports of { r_add_the(rname()) } { rname() } to { p_add_the(pname()) } { pname() } { exports_growth_increase_decrease() } from
+                            (annualized { exports_growth_increase_decrease_2() } of { exports_growth_2() }).")
+      } else {
+        glue("The exports of { r_add_the(rname()) } { rname() } to { p_add_the(pname()) } { pname() } { exports_growth_increase_decrease() } from
                             { exp_val_min_yr_2() } in { min(inp_y()) }
                             to { exp_val_max_yr_2() } in { max(inp_y()) } (annualized { exports_growth_increase_decrease_2() } of
                             { exports_growth_2() }). { p_add_the(pname()) } { pname() } was the No. { trd_rankings_no_min_yr() } trading partner of
             { r_add_the(rname()) } { rname() } in { min(inp_y()) } (represented { trd_rankings_exp_share_min_yr_2() } of its exports), and
                             then { trd_rankings_remained() } No. { trd_rankings_no_max_yr() } in { max(inp_y()) } (represented { trd_rankings_exp_share_max_yr_2() }
                             of its exports).")
-      )
+      }
     })
 
     trd_smr_txt_imp <- eventReactive(input$go, {
-      switch(tbl_agg,
-        "yr" = glue("The imports of { r_add_the(rname()) } { rname() } to the World { imports_growth_increase_decrease() } from
+      if (inp_p() == "ALL") {
+        glue("The imports of { r_add_the(rname()) } { rname() } from the World { imports_growth_increase_decrease() } from
                            { imp_val_min_yr_2() } in { min(inp_y()) } to { imp_val_max_yr_2() } in { max(inp_y()) }
-                           (annualized { imports_growth_increase_decrease_2() } of { imports_growth_2() })."),
-        "yrp" = glue("The imports of { r_add_the(rname()) } { rname() } to { p_add_the(pname()) } { pname() } { imports_growth_increase_decrease() } from
+                           (annualized { imports_growth_increase_decrease_2() } of { imports_growth_2() }).")
+      } else {
+        glue("The imports of { r_add_the(rname()) } { rname() } from { p_add_the(pname()) } { pname() } { imports_growth_increase_decrease() } from
                             { imp_val_min_yr_2() } in { min(inp_y()) }
                             to { imp_val_max_yr_2() } in { max(inp_y()) } (annualized { imports_growth_increase_decrease_2() } of
                             { imports_growth_2() }). { p_add_the(pname()) } { pname() } was the No. { trd_rankings_no_min_yr() } trading partner of
             { r_add_the(rname()) } { rname() } in { min(inp_y()) } (represented { trd_rankings_imp_share_min_yr_2() } of its imports), and
                             then { trd_rankings_remained() } No. { trd_rankings_no_max_yr() } in { max(inp_y()) } (represented { trd_rankings_imp_share_max_yr_2() }
                             of its imports).")
-      )
+      }
     })
 
     trd_exc_columns_title <- eventReactive(input$go, {
-      switch(tbl_agg,
-        "yr" = glue("{ r_add_upp_the(rname()) } { rname() } multilateral trade between { min(inp_y()) } and { max(inp_y()) }"),
-        "yrp" = glue("{ r_add_upp_the(rname()) } { rname() } and { p_add_the(pname()) } { pname() } exchange between { min(inp_y()) } and { max(inp_y()) }")
-      )
+      if (inp_p() == "ALL") {
+        glue("{ r_add_upp_the(rname()) } { rname() } multilateral trade between { min(inp_y()) } and { max(inp_y()) }")
+      } else {
+        glue("{ r_add_upp_the(rname()) } { rname() } and { p_add_the(pname()) } { pname() } exchange between { min(inp_y()) } and { max(inp_y()) }")
+      }
     })
 
     trd_exc_columns_agg <- reactive({
@@ -659,10 +725,11 @@ mod_countries_server <- function(id) {
     ### Visual elements ----
 
     exp_tt_yr <- eventReactive(input$go, {
-      switch(tbl_dtl,
-        "yrc" = glue("Exports of { r_add_the(rname()) } { rname() } to the rest of the World in { min(inp_y()) } and { max(inp_y()) }, by product"),
-        "yrpc" = glue("Exports of { r_add_the(rname()) } { rname() } to { p_add_the(pname()) } { pname() } in { min(inp_y()) } and { max(inp_y()) }, by product")
-      )
+      if (inp_p() == "ALL") {
+        glue("Exports of { r_add_the(rname()) } { rname() } to the rest of the World in { min(inp_y()) } and { max(inp_y()) }, by product")
+      } else {
+        glue("Exports of { r_add_the(rname()) } { rname() } to { p_add_the(pname()) } { pname() } in { min(inp_y()) } and { max(inp_y()) }, by product")
+      }
     })
 
     # Export column chart titles
@@ -732,7 +799,7 @@ mod_countries_server <- function(id) {
 
       hchart(d, "column", hcaes(x = "country_name", y = "trade_value_usd_exp"),
              color = "#85cca6",
-             tooltip = list(pointFormatter = custom_tooltip_short())) %>%
+             tooltip = list(pointFormat = "<b>{point.y:,.0f} USD</b>")) %>%
         hc_xAxis(title = list(text = "Country")) %>%
         hc_yAxis(title = list(text = "USD billion"),
                  labels = list(formatter = JS("function() { return this.value / 1000000000 }"))) %>%
@@ -790,7 +857,7 @@ mod_countries_server <- function(id) {
 
       hchart(d, "column", hcaes(x = "country_name", y = "percentage"),
              color = "#85cca6",
-             tooltip = list(pointFormatter = JS("function() { return this.point.name + ': <b>' + this.y + '%</b>'; }"))) %>%
+             tooltip = list(pointFormat = "<b>{point.y}%</b>")) %>%
         hc_xAxis(title = list(text = "Country")) %>%
         hc_yAxis(title = list(text = "Percentage (%)")) %>%
         hc_title(text = exp_col_min_yr_pct_tt())
@@ -846,7 +913,7 @@ mod_countries_server <- function(id) {
 
       hchart(d, "column", hcaes(x = "country_name", y = "trade_value_usd_exp"),
              color = "#67c090",
-             tooltip = list(pointFormatter = custom_tooltip_short())) %>%
+             tooltip = list(pointFormat = "<b>{point.y:,.0f} USD</b>")) %>%
         hc_xAxis(title = list(text = "Country")) %>%
         hc_yAxis(title = list(text = "USD billion"),
                  labels = list(formatter = JS("function() { return this.value / 1000000000 }"))) %>%
@@ -904,7 +971,7 @@ mod_countries_server <- function(id) {
 
       hchart(d, "column", hcaes(x = "country_name", y = "percentage"),
              color = "#67c090",
-             tooltip = list(pointFormatter = JS("function() { return this.point.name + ': <b>' + this.y + '%</b>'; }"))) %>%
+             tooltip = list(pointFormat = "<b>{point.y}%</b>")) %>%
         hc_xAxis(title = list(text = "Country")) %>%
         hc_yAxis(title = list(text = "Percentage (%)")) %>%
         hc_title(text = exp_col_max_yr_pct_tt())
@@ -1000,10 +1067,11 @@ mod_countries_server <- function(id) {
     ### Visual elements ----
 
     imp_tt_yr <- eventReactive(input$go, {
-      switch(tbl_dtl,
-        "yrc" = glue("Imports of { r_add_the(rname()) } { rname() } from the rest of the World in { min(inp_y()) } and { max(inp_y()) }, by product"),
-        "yrpc" = glue("Imports of { r_add_the(rname()) } { rname() } from { p_add_the(pname()) } { pname() } in { min(inp_y()) } and { max(inp_y()) }, by product")
-      )
+      if (inp_p() == "ALL") {
+        glue("Imports of { r_add_the(rname()) } { rname() } from the rest of the World in { min(inp_y()) } and { max(inp_y()) }, by product")
+      } else {
+        glue("Imports of { r_add_the(rname()) } { rname() } from { p_add_the(pname()) } { pname() } in { min(inp_y()) } and { max(inp_y()) }, by product")
+      }
     })
 
     imp_tt_min_yr <- eventReactive(input$go, {
@@ -1077,7 +1145,7 @@ mod_countries_server <- function(id) {
 
       hchart(d, "column", hcaes(x = "country_name", y = "trade_value_usd_imp"),
              color = "#518498",
-             tooltip = list(pointFormatter = custom_tooltip_short())) %>%
+             tooltip = list(pointFormat = "<b>{point.y:,.0f} USD</b>")) %>%
         hc_xAxis(title = list(text = "Country")) %>%
         hc_yAxis(title = list(text = "USD billion"),
                  labels = list(formatter = JS("function() { return this.value / 1000000000 }"))) %>%
@@ -1135,7 +1203,7 @@ mod_countries_server <- function(id) {
 
       hchart(d, "column", hcaes(x = "country_name", y = "percentage"),
              color = "#518498",
-             tooltip = list(pointFormatter = JS("function() { return this.point.name + ': <b>' + this.y + '%</b>'; }"))) %>%
+             tooltip = list(pointFormat = "<b>{point.y}%</b>")) %>%
         hc_xAxis(title = list(text = "Country")) %>%
         hc_yAxis(title = list(text = "Percentage (%)")) %>%
         hc_title(text = imp_col_min_yr_pct_tt())
@@ -1191,7 +1259,7 @@ mod_countries_server <- function(id) {
 
       hchart(d, "column", hcaes(x = "country_name", y = "trade_value_usd_imp"),
              color = "#26667f",
-             tooltip = list(pointFormatter = custom_tooltip_short())) %>%
+             tooltip = list(pointFormat = "<b>{point.y:,.0f} USD</b>")) %>%
         hc_xAxis(title = list(text = "Country")) %>%
         hc_yAxis(title = list(text = "USD billion"),
                  labels = list(formatter = JS("function() { return this.value / 1000000000 }"))) %>%
@@ -1249,7 +1317,7 @@ mod_countries_server <- function(id) {
 
       hchart(d, "column", hcaes(x = "country_name", y = "percentage"),
              color = "#26667f",
-             tooltip = list(pointFormatter = JS("function() { return this.point.name + ': <b>' + this.y + '%</b>'; }"))) %>%
+             tooltip = list(pointFormat = "<b>{point.y}%</b>")) %>%
         hc_xAxis(title = list(text = "Country")) %>%
         hc_yAxis(title = list(text = "Percentage (%)")) %>%
         hc_title(text = imp_col_max_yr_pct_tt())
@@ -1335,10 +1403,11 @@ mod_countries_server <- function(id) {
     ### Trade ----
 
     output$trd_stl <- eventReactive(input$go, {
-      switch(tbl_dtl,
-        "yrc" = glue("Total multilateral Exports and Imports"),
-        "yrpc" = glue("Total bilateral Exports and Imports")
-      )
+      if (inp_p() == "ALL") {
+        glue("Total multilateral Exports and Imports")
+      } else {
+        glue("Total bilateral Exports and Imports")
+      }
     })
 
     output$trd_stl_exp <- eventReactive(input$go, {
