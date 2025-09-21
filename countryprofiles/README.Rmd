@@ -13,17 +13,17 @@ knitr::opts_chunk$set(
 )
 ```
 
-# otsshinycountryprofiles
+# tradestatisticsshiny
 
 <!-- badges: start -->
 <!-- badges: end -->
 
-The goal of otsshinycountryprofiles is to visualize international trade flows
+The goal of tradestatisticsshiny is to visualize international trade flows
 for different countries. This is a part of [https://tradestatistics.io](tradestatistics.io).
 
 ## Installation
 
-You can install the development version of otsshinycountryprofiles from [GitHub](https://github.com/) with:
+You can install the development version of tradestatisticsshiny from [GitHub](https://github.com/) with:
 
 ``` r
 # install.packages("remotes")

@@ -4,4 +4,4 @@
 
 pkgload::load_all(export_all = FALSE,helpers = FALSE,attach_testthat = FALSE)
 options( "golem.app.prod" = TRUE)
-otsshinycountryprofiles::run_app() # add parameters here (if any)
+tradestatisticsshiny::run_app() # add parameters here (if any)

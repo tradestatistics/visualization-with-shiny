@@ -1,18 +1,18 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# otsshinycountryprofiles
+# tradestatisticsshiny
 
 <!-- badges: start -->
 <!-- badges: end -->
 
-The goal of otsshinycountryprofiles is to visualize international trade
+The goal of tradestatisticsshiny is to visualize international trade
 flows for different countries. This is a part of
 [https://tradestatistics.io](tradestatistics.io).
 
 ## Installation
 
-You can install the development version of otsshinycountryprofiles from
+You can install the development version of tradestatisticsshiny from
 [GitHub](https://github.com/) with:
 
 ``` r

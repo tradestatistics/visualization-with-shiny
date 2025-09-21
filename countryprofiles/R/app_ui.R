@@ -4,7 +4,6 @@
 #'     DO NOT REMOVE.
 #' @import shiny
 #' @import shinydashboard
-#' @import otsshinycommon
 #' @importFrom highcharter highchartOutput
 #' @importFrom shinyhelper helper
 #' @importFrom shinyjs useShinyjs

@@ -2,7 +2,6 @@
 #'
 #' @param input,output,session Internal parameters for {shiny}.
 #'     DO NOT REMOVE.
-#' @import otsshinycommon
 #' @importFrom dplyr arrange bind_rows case_when collect dense_rank desc
 #'     distinct everything filter group_by inner_join left_join mutate select summarise
 #'     tbl tibble ungroup pull slice_head
@@ -38,9 +37,11 @@ app_server <- function(input, output, session) {
   inp_r <- reactive({
     input$r
   }) # reporter
+
   inp_p <- reactive({
     input$p
   }) # partner
+  
   inp_d <- reactive({
     input$d
   }) # adjust dollar
@@ -63,6 +64,42 @@ app_server <- function(input, output, session) {
     out <- names(available_reporters_iso()[available_reporters_iso() == inp_r()])
     if (length(out) == 0 || is.na(out) || nchar(out) == 0) return(inp_r())
     out
+  })
+
+  # diagnostic: section totals for the most recent year
+  section_totals_recent <- reactive({
+    req(inp_y())
+
+    yr <- max(inp_y())
+
+    d <- df_dtl() %>%
+      filter(year == !!yr) %>%
+      # mutate(
+      #   section_code = as.character(section_code),
+      #   trade_value_usd_exp = dplyr::coalesce(trade_value_usd_exp, 0),
+      #   trade_value_usd_imp = dplyr::coalesce(trade_value_usd_imp, 0)
+      # ) %>%
+      group_by(section_code) %>%
+      summarise(
+        trade_exp = sum(trade_value_usd_exp, na.rm = TRUE),
+        trade_imp = sum(trade_value_usd_imp, na.rm = TRUE),
+        .groups = "drop"
+      ) %>%
+      mutate(exchange = trade_exp + trade_imp)
+
+    # join canonical mapping (if available) and provide defaults
+    cs <- tryCatch(top_sections(), error = function(e) NULL)
+    if (!is.null(cs)) {
+      d <- d %>%
+        left_join(cs, by = "section_code") %>%
+        mutate(
+          section_name = dplyr::coalesce(section_name, "Other products"),
+          section_color = dplyr::coalesce(section_color, "#434348")
+        ) %>%
+        select(section_code, section_name, section_color, trade_exp, trade_imp, exchange)
+    }
+
+    d
   })
 
   pname <- eventReactive(input$go, {
@@ -130,6 +167,7 @@ app_server <- function(input, output, session) {
     bindCache(inp_y(), inp_r(), inp_p(), inp_d()) %>%
     bindEvent(input$go)
 
+
   df_dtl <- reactive({
     d <- tbl(con, tbl_dtl())
 
@@ -151,7 +189,7 @@ app_server <- function(input, output, session) {
     d <- d %>%
       inner_join(
         tbl(con, "commodities") %>%
-          distinct(!!sym("commodity_code"), !!sym("section_code"), !!sym("section_name"), !!sym("section_color")),
+          distinct(!!sym("commodity_code"), !!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short"), !!sym("commodity_name")),
         by = c("commodity_code", "section_code")
       )
 
@@ -167,6 +205,51 @@ app_server <- function(input, output, session) {
   }) %>%
     bindCache(inp_y(), inp_r(), inp_p(), inp_d(), tbl_dtl()) %>%
     bindEvent(input$go)
+
+
+  # Build a full sections summary table (canonical colors + trade values) and
+  # write to /tmp for local inspection. This keeps all sections and avoids any
+  # 'other' lumping; useful for debugging treemap visibility.
+  sections_summary <- reactive({
+    # collect detailed data and canonical commodities
+    d_dtl <- df_dtl() %>%
+      filter(!!sym("year") %in% !!inp_y()) %>%
+      collect()
+
+    commodities_ref <- tbl(con, "commodities") %>%
+      distinct(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short"), !!sym("commodity_code")) %>%
+      collect()
+
+    # ensure commodity identifiers exist in d_dtl; prefer commodity_code_short when present
+    if (!"commodity_code_short" %in% names(d_dtl)) {
+      # attempt to derive short code from commodity_code if possible
+      d_dtl <- d_dtl %>% mutate(commodity_code_short = as.character(!!sym("commodity_code")))
+    }
+    if (!"commodity_name" %in% names(d_dtl)) {
+      d_dtl <- d_dtl %>% mutate(commodity_name = NA_character_)
+    }
+
+    # aggregate raw data by year/section/commodity using available identifiers
+    d_raw <- d_dtl %>%
+      group_by(year, section_code, section_name, section_color, commodity_code_short, commodity_name) %>%
+      summarise(
+        trade_exp = sum(trade_value_usd_exp, na.rm = TRUE),
+        trade_imp = sum(trade_value_usd_imp, na.rm = TRUE),
+        .groups = "drop"
+      )
+
+    # left-join onto canonical reference using commodity_code_short when possible
+    master <- commodities_ref %>%
+      select(section_code, section_name, section_color, commodity_code_short, commodity_code) %>%
+      distinct() %>%
+      left_join(d_raw, by = c("section_code", "section_name", "commodity_code_short")) %>%
+      mutate(trade_exp = dplyr::coalesce(trade_exp, 0), trade_imp = dplyr::coalesce(trade_imp, 0)) %>%
+      arrange(section_name)
+
+
+
+    master
+  })
 
   ## Trade ----
 
@@ -424,6 +507,7 @@ app_server <- function(input, output, session) {
     )
   })
 
+
   trd_exc_columns_agg <- reactive({
     d <- tr_tbl_agg()
 
@@ -473,60 +557,58 @@ app_server <- function(input, output, session) {
     )
   })
 
+
   exp_col_dtl_yr <- reactive({
-    d <- df_dtl() %>%
-      filter(!!sym("year") == min(inp_y())) %>%
-      p_aggregate_by_section(col = "trade_value_usd_exp", con = con) %>%
-      group_by(!!sym("section_name"), !!sym("section_color")) %>%
-      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop") %>%
-      mutate(year = min(inp_y())) %>%
-      filter(!!sym("trade_value") > 0) %>%
-      mutate(section_name = fct_lump_n(
-        f = !!sym("section_name"),
-        n = 10,
-        w = !!sym("trade_value"),
-        other_level = "Other products"
-      )) %>%
-      # Assign neutral color to "Other products"
-      mutate(section_color = case_when(
-        as.character(!!sym("section_name")) == "Other products" ~ "#434348",
-        TRUE ~ !!sym("section_color")
-      )) %>%
-      group_by(!!sym("year"), !!sym("section_name"), !!sym("section_color")) %>%
-      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop") %>%
-      bind_rows(
-        df_dtl() %>%
-          filter(!!sym("year") == max(inp_y())) %>%
-          p_aggregate_by_section(col = "trade_value_usd_exp", con = con) %>%
-          group_by(!!sym("section_name"), !!sym("section_color")) %>%
-          summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop") %>%
-          mutate(year = max(inp_y())) %>%
-          filter(!!sym("trade_value") > 0) %>%
-          mutate(section_name = fct_lump_n(
-            f = !!sym("section_name"),
-            n = 10,
-            w = !!sym("trade_value"),
-            other_level = "Other products"
-          )) %>%
-          # Assign neutral color to "Other products"
-          mutate(section_color = case_when(
-            as.character(!!sym("section_name")) == "Other products" ~ "#434348",
-            TRUE ~ !!sym("section_color")
-          )) %>%
-          group_by(!!sym("year"), !!sym("section_name"), !!sym("section_color")) %>%
-          summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop")
-      )
+    # Build columns using the canonical top-9 sections + 'Other products'
+    cs <- top_sections()
+
+    # aggregate section totals for min and max years (one row per section per year)
+    years <- c(min(inp_y()), max(inp_y()))
     
-    d <- d %>%
-      mutate(section_name = as.character(!!sym("section_name"))) %>%
-      mutate(section_name = ifelse(nchar(!!sym("section_name")) <= 30, !!sym("section_name"),
-        paste0(sub("^(\\S*\\s+\\S+\\S*\\s+\\S+\\S*\\s+\\S+\\S*\\s+\\S+).*", "\\1", section_name), "...")
-      ))
+    d <- df_dtl() %>%
+      filter(year %in% !!years) %>%
+      mutate(
+        trade_value_usd_exp = dplyr::coalesce(trade_value_usd_exp, 0),
+        trade_value_usd_imp = dplyr::coalesce(trade_value_usd_imp, 0),
+        section_code = as.character(section_code)
+      ) %>%
+      group_by(year, section_code, section_name, section_color) %>%
+      summarise(
+        trade_exp = sum(trade_value_usd_exp, na.rm = TRUE),
+        trade_imp = sum(trade_value_usd_imp, na.rm = TRUE),
+        .groups = "drop"
+      ) %>%
+      mutate(
+        # exports chart -> use exports totals
+        trade = trade_exp,
+        exchange = trade_exp + trade_imp
+      ) %>%
+      # collapse non-top sections into 'other'
+      mutate(
+        section_code_mapped = ifelse(section_code %in% cs$section_code, section_code, "other")
+      ) %>%
+      # join with canonical sections to get proper names/colors for "other"
+      left_join(cs, by = c("section_code_mapped" = "section_code"), suffix = c("_orig", "_canonical")) %>%
+      mutate(
+        section_name_final = dplyr::coalesce(section_name_canonical, section_name_orig, "Other products"),
+        section_color_final = dplyr::coalesce(section_color_canonical, section_color_orig, "#434348")
+      ) %>%
+      group_by(year, section_code_mapped, section_name_final, section_color_final) %>%
+      summarise(
+        trade = sum(trade, na.rm = TRUE),
+        exchange = sum(exchange, na.rm = TRUE),
+        .groups = "drop"
+      ) %>%
+      select(year, section_code = section_code_mapped, section_name = section_name_final, section_color = section_color_final, trade, exchange) %>%
+      mutate(year = as.character(year)) %>%
+      arrange(year, desc(exchange)) %>%
+      # ensure plotting order: factor section_name with 'Other products' last
+      mutate(section_name = factor(as.character(section_name), levels = c(setdiff(cs$section_name, "Other products"), "Other products")))
 
     hchart(d,
       "column",
       hcaes(
-        x = "section_name", y = "trade_value", group = "year",
+        x = "section_name", y = "trade", group = "year",
         color = "section_color"
       ),
       tooltip = list(
@@ -546,52 +628,45 @@ app_server <- function(input, output, session) {
     bindCache(inp_y(), inp_r(), inp_p(), inp_d()) %>%
     bindEvent(input$go)
 
+
+  # top_sections: return a data.frame with 9 largest sections + 'other' and colors
+  top_sections <- reactive({
+    req(inp_y())
+    
+    # compute exchange (exports + imports) by section across selected years
+    totals <- df_dtl() %>%
+      filter(year %in% !!inp_y()) %>%
+      mutate(
+        section_code = as.character(section_code),
+        section_name = as.character(section_name),
+        section_color = as.character(section_color),
+        trade_value_usd_exp = dplyr::coalesce(trade_value_usd_exp, 0),
+        trade_value_usd_imp = dplyr::coalesce(trade_value_usd_imp, 0)
+      ) %>%
+      group_by(section_code, section_name, section_color) %>%
+      summarise(exchange = sum(trade_value_usd_exp + trade_value_usd_imp, na.rm = TRUE), .groups = "drop") %>%
+      arrange(desc(exchange))
+
+    # top 9 codes by exchange
+    top9 <- totals %>% slice_head(n = 9)
+
+    out <- top9 %>% select(section_code, section_name, section_color)
+    # append canonical 'Other products' at the end
+    out <- bind_rows(out, tibble(section_code = "other", section_name = "Other products", section_color = "#434348"))
+    out
+  })
+
   exp_tt_min_yr <- eventReactive(input$go, {
     glue("Exports in { min(inp_y()) }")
   })
 
+
   exp_tm_dtl_min_yr <- reactive({
-    # canonical commodities reference (preserve codes and short codes)
-    commodities_ref <- tbl(con, "commodities") %>%
-      distinct(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short")) %>%
-      collect()
-
-    # aggregate raw data by section/commodity (keep section_code)
-    d_raw <- df_dtl() %>%
+    d <- df_dtl() %>%
       filter(!!sym("year") == min(inp_y())) %>%
-      p_aggregate_by_section(col = "trade_value_usd_exp", con = con) %>%
-      filter(!!sym("trade_value") > 0) %>%
-      group_by(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short"), !!sym("commodity_name")) %>%
-      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop")
+      p_aggregate_by_section(col = "trade_value_usd_exp", con = con)
 
-    # left-join onto canonical commodities to ensure fixed ordering and codes
-    d <- commodities_ref %>%
-      left_join(d_raw %>% select(-!!rlang::sym("section_color")), by = c("section_code", "section_name", "commodity_code_short")) %>%
-      filter(!is.na(!!rlang::sym("trade_value")) & !!rlang::sym("trade_value") > 0) %>%
-      mutate(trade_value = as.numeric(!!rlang::sym("trade_value")))
-
-    # compute section totals and pick top N sections (by trade_value)
-    top_sections <- d %>%
-      group_by(!!sym("section_code"), !!sym("section_name")) %>%
-      summarise(section_total = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop") %>%
-      arrange(desc(!!sym("section_total"))) %>%
-      slice_head(n = 10) %>%
-      pull(!!sym("section_code"))
-
-    # lump small sections into Other products and reaggregate, assign stable code 'other'
-    d <- d %>%
-      mutate(section_code = ifelse(!!sym("section_code") %in% top_sections, !!sym("section_code"), "other"),
-             section_name = ifelse(section_code == "other", "Other products", section_name),
-             section_color = ifelse(section_code == "other", "#434348", section_color)) %>%
-      group_by(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short"), !!sym("commodity_name")) %>%
-      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop")
-
-    # Build ordered d2 including Other products so colors are canonical and ordered
-    d2 <- commodities_ref %>%
-      select(!!sym("section_code"), !!sym("section_name"), !!sym("section_color")) %>%
-      distinct() %>%
-      bind_rows(tibble(section_code = "other", section_name = "Other products", section_color = "#434348")) %>%
-      distinct(section_code, section_name, section_color)
+    d2 <- p_colors(d, con = con)
 
     p_to_highcharts(d, d2)
   }) %>%
@@ -602,42 +677,13 @@ app_server <- function(input, output, session) {
     glue("Exports in { max(inp_y()) }")
   })
 
+
   exp_tm_dtl_max_yr <- reactive({
-    commodities_ref <- tbl(con, "commodities") %>%
-      distinct(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short")) %>%
-      collect()
-
-    d_raw <- df_dtl() %>%
+    d <- df_dtl() %>%
       filter(!!sym("year") == max(inp_y())) %>%
-      p_aggregate_by_section(col = "trade_value_usd_exp", con = con) %>%
-      filter(!!sym("trade_value") > 0) %>%
-      group_by(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short"), !!sym("commodity_name")) %>%
-      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop")
+      p_aggregate_by_section(col = "trade_value_usd_exp", con = con)
 
-    d <- commodities_ref %>%
-      left_join(d_raw %>% select(-!!rlang::sym("section_color")), by = c("section_code", "section_name", "commodity_code_short")) %>%
-      filter(!is.na(!!rlang::sym("trade_value")) & !!rlang::sym("trade_value") > 0) %>%
-      mutate(trade_value = as.numeric(!!rlang::sym("trade_value")))
-
-    top_sections <- d %>%
-      group_by(!!sym("section_code"), !!sym("section_name")) %>%
-      summarise(section_total = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop") %>%
-      arrange(desc(!!sym("section_total"))) %>%
-      slice_head(n = 10) %>%
-      pull(!!sym("section_code"))
-
-    d <- d %>%
-      mutate(section_code = ifelse(!!sym("section_code") %in% top_sections, !!sym("section_code"), "other"),
-             section_name = ifelse(section_code == "other", "Other products", section_name),
-             section_color = ifelse(section_code == "other", "#434348", section_color)) %>%
-      group_by(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short"), !!sym("commodity_name")) %>%
-      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop")
-
-    d2 <- commodities_ref %>%
-      select(!!sym("section_code"), !!sym("section_name"), !!sym("section_color")) %>%
-      distinct() %>%
-      bind_rows(tibble(section_code = "other", section_name = "Other products", section_color = "#434348")) %>%
-      distinct(section_code, section_name, section_color)
+    d2 <- p_colors(d, con = con)
 
     p_to_highcharts(d, d2)
   }) %>%
@@ -659,60 +705,58 @@ app_server <- function(input, output, session) {
     glue("Imports in { min(inp_y()) }")
   })
 
-  imp_col_dtl_yr <- reactive({
-    d <- df_dtl() %>%
-      filter(!!sym("year") == min(inp_y())) %>%
-      p_aggregate_by_section(col = "trade_value_usd_imp", con = con) %>%
-      group_by(!!sym("section_name"), !!sym("section_color")) %>%
-      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop") %>%
-      mutate(year = min(inp_y())) %>%
-      filter(!!sym("trade_value") > 0) %>%
-      mutate(section_name = fct_lump_n(
-        f = !!sym("section_name"),
-        n = 10,
-        w = !!sym("trade_value"),
-        other_level = "Other products"
-      )) %>%
-      # Assign neutral color to "Other products"
-      mutate(section_color = case_when(
-        as.character(!!sym("section_name")) == "Other products" ~ "#434348",
-        TRUE ~ !!sym("section_color")
-      )) %>%
-      group_by(!!sym("year"), !!sym("section_name"), !!sym("section_color")) %>%
-      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop") %>%
-      bind_rows(
-        df_dtl() %>%
-          filter(!!sym("year") == max(inp_y())) %>%
-          p_aggregate_by_section(col = "trade_value_usd_imp", con = con) %>%
-          group_by(!!sym("section_name"), !!sym("section_color")) %>%
-          summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop") %>%
-          mutate(year = max(inp_y())) %>%
-          filter(!!sym("trade_value") > 0) %>%
-          mutate(section_name = fct_lump_n(
-            f = !!sym("section_name"),
-            n = 10,
-            w = !!sym("trade_value"),
-            other_level = "Other products"
-          )) %>%
-          # Assign neutral color to "Other products"
-          mutate(section_color = case_when(
-            as.character(!!sym("section_name")) == "Other products" ~ "#434348",
-            TRUE ~ !!sym("section_color")
-          )) %>%
-          group_by(!!sym("year"), !!sym("section_name"), !!sym("section_color")) %>%
-          summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop")
-      )
 
-    # d <- d %>%
-    #   mutate(section_name = as.character(section_name)) %>%
-    #   mutate(section_name = ifelse(nchar(section_name) <= 30, section_name,
-    #     paste0(sub("^(\\S*\\s+\\S+\\S*\\s+\\S+\\S*\\s+\\S+\\S*\\s+\\S+).*", "\\1", section_name), "...")
-    #   ))
+  imp_col_dtl_yr <- reactive({
+    # Use top_sections (exchange-based) for canonical mapping
+    cs <- top_sections()
+
+    years <- c(min(inp_y()), max(inp_y()))
+
+    d <- df_dtl() %>%
+      filter(year %in% !!years) %>%
+      mutate(
+        section_code = as.character(section_code),
+        section_name = as.character(section_name),
+        section_color = as.character(section_color),
+        trade_value_usd_exp = dplyr::coalesce(trade_value_usd_exp, 0),
+        trade_value_usd_imp = dplyr::coalesce(trade_value_usd_imp, 0)
+      ) %>%
+      group_by(year, section_code, section_name, section_color) %>%
+      summarise(
+        trade_imp = sum(trade_value_usd_imp, na.rm = TRUE),
+        trade_exp = sum(trade_value_usd_exp, na.rm = TRUE),
+        .groups = "drop"
+      ) %>%
+      mutate(
+        trade = trade_imp,
+        trade_exchange = trade_imp + trade_exp
+      ) %>%
+      # collapse non-top sections into 'other'
+      mutate(
+        section_code_mapped = ifelse(section_code %in% cs$section_code, section_code, "other")
+      ) %>%
+      # join with canonical sections to get proper names/colors for "other"
+      left_join(cs, by = c("section_code_mapped" = "section_code"), suffix = c("_orig", "_canonical")) %>%
+      mutate(
+        section_name_final = dplyr::coalesce(section_name_canonical, section_name_orig, "Other products"),
+        section_color_final = dplyr::coalesce(section_color_canonical, section_color_orig, "#434348")
+      ) %>%
+      group_by(year, section_code_mapped, section_name_final, section_color_final) %>%
+      summarise(
+        trade = sum(trade, na.rm = TRUE),
+        trade_exchange = sum(trade_exchange, na.rm = TRUE),
+        .groups = "drop"
+      ) %>%
+      select(year, section_code = section_code_mapped, section_name = section_name_final, section_color = section_color_final, trade, trade_exchange) %>%
+      mutate(year = as.character(year)) %>%
+      arrange(year, desc(trade_exchange)) %>%
+      # ensure plotting order: factor section_name with 'Other products' last
+      mutate(section_name = factor(as.character(section_name), levels = c(setdiff(cs$section_name, "Other products"), "Other products")))
 
     hchart(d,
       "column",
       hcaes(
-        x = "section_name", y = "trade_value", group = "year",
+        x = "section_name", y = "trade", group = "year",
         color = "section_color"
       ),
       tooltip = list(
@@ -732,42 +776,13 @@ app_server <- function(input, output, session) {
     bindCache(inp_y(), inp_r(), inp_p(), inp_d()) %>%
     bindEvent(input$go)
 
+
   imp_tm_dtl_min_yr <- reactive({
-    commodities_ref <- tbl(con, "commodities") %>%
-      distinct(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short")) %>%
-      collect()
-
-    d_raw <- df_dtl() %>%
+    d <- df_dtl() %>%
       filter(!!sym("year") == min(inp_y())) %>%
-      p_aggregate_by_section(col = "trade_value_usd_imp", con = con) %>%
-      filter(!!sym("trade_value") > 0) %>%
-      group_by(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short"), !!sym("commodity_name")) %>%
-      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop")
+      p_aggregate_by_section(col = "trade_value_usd_imp", con = con)
 
-    d <- commodities_ref %>%
-      left_join(d_raw, by = c("section_code", "section_name", "commodity_code_short")) %>%
-      filter(!is.na(!!rlang::sym("trade_value")) & !!rlang::sym("trade_value") > 0) %>%
-      mutate(trade_value = as.numeric(!!rlang::sym("trade_value")))
-
-    top_sections <- d %>%
-      group_by(!!sym("section_code"), !!sym("section_name")) %>%
-      summarise(section_total = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop") %>%
-      arrange(desc(!!sym("section_total"))) %>%
-      slice_head(n = 10) %>%
-      pull(!!sym("section_code"))
-
-    d <- d %>%
-      mutate(section_code = ifelse(!!sym("section_code") %in% top_sections, !!sym("section_code"), "other"),
-             section_name = ifelse(section_code == "other", "Other products", section_name),
-             section_color = ifelse(section_code == "other", "#434348", section_color)) %>%
-      group_by(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short"), !!sym("commodity_name")) %>%
-      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop")
-
-    d2 <- commodities_ref %>%
-      select(!!sym("section_code"), !!sym("section_name"), !!sym("section_color")) %>%
-      distinct() %>%
-      bind_rows(tibble(section_code = "other", section_name = "Other products", section_color = "#434348")) %>%
-      distinct(section_code, section_name, section_color)
+    d2 <- p_colors(d, con = con)
 
     p_to_highcharts(d, d2)
   }) %>%
@@ -777,43 +792,14 @@ app_server <- function(input, output, session) {
   imp_tt_max_yr <- eventReactive(input$go, {
     glue("Imports in { max(inp_y()) }")
   })
+  
 
   imp_tm_dtl_max_yr <- reactive({
-    commodities_ref <- tbl(con, "commodities") %>%
-      distinct(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short")) %>%
-      collect()
-
-    d_raw <- df_dtl() %>%
+    d <- df_dtl() %>%
       filter(!!sym("year") == max(inp_y())) %>%
-      p_aggregate_by_section(col = "trade_value_usd_imp", con = con) %>%
-      filter(!!sym("trade_value") > 0) %>%
-      group_by(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short"), !!sym("commodity_name")) %>%
-      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop")
+      p_aggregate_by_section(col = "trade_value_usd_imp", con = con)
 
-    d <- commodities_ref %>%
-      left_join(d_raw, by = c("section_code", "section_name", "commodity_code_short")) %>%
-      filter(!is.na(!!rlang::sym("trade_value")) & !!rlang::sym("trade_value") > 0) %>%
-      mutate(trade_value = as.numeric(!!rlang::sym("trade_value")))
-
-    top_sections <- d %>%
-      group_by(!!sym("section_code"), !!sym("section_name")) %>%
-      summarise(section_total = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop") %>%
-      arrange(desc(!!sym("section_total"))) %>%
-      slice_head(n = 10) %>%
-      pull(!!sym("section_code"))
-
-    d <- d %>%
-      mutate(section_code = ifelse(!!sym("section_code") %in% top_sections, !!sym("section_code"), "other"),
-             section_name = ifelse(section_code == "other", "Other products", section_name),
-             section_color = ifelse(section_code == "other", "#434348", section_color)) %>%
-      group_by(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short"), !!sym("commodity_name")) %>%
-      summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop")
-
-    d2 <- commodities_ref %>%
-      select(!!sym("section_code"), !!sym("section_name"), !!sym("section_color")) %>%
-      distinct() %>%
-      bind_rows(tibble(section_code = "other", section_name = "Other products", section_color = "#434348")) %>%
-      distinct(section_code, section_name, section_color)
+    d2 <- p_colors(d, con = con)
 
     wt$inc(3)
 

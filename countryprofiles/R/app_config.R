@@ -9,7 +9,7 @@
 #'
 #' @noRd
 app_sys <- function(...) {
-  system.file(..., package = "otsshinycountryprofiles")
+  system.file(..., package = "tradestatisticsshiny")
 }
 
 

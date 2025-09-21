@@ -1,4 +1,4 @@
-Package: otsshinycountryprofiles
+Package: tradestatisticsshiny
 Title: Open Trade Statistics Country App
 Version: 2025.09.20
 Authors@R: 
@@ -20,7 +20,6 @@ Imports:
     highcharter (>= 0.9.4),
     lubridate (>= 1.8.0),
     magrittr (>= 2.0.3),
-    otsshinycommon (>= 2022.07.09),
     rio (>= 0.5.29),
     rlang (>= 1.0.2),
     shiny (>= 1.7.1),

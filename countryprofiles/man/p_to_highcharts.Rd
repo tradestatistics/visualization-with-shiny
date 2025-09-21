@@ -4,14 +4,12 @@
 \alias{p_to_highcharts}
 \title{Product to Highcharter (For Highcharter Visuals)}
 \usage{
-p_to_highcharts(d, d2 = NULL)
+p_to_highcharts(d, d2)
 }
 \arguments{
 \item{d}{input dataset for values}
 
-\item{d2}{optional dataset for colours (when provided it will be used as the
-color reference so the same `section_name` maps to the same colour across
-different treemaps)}
+\item{d2}{input dataset for colours}
 }
 \description{
 Product to Highcharter (For Highcharter Visuals)
