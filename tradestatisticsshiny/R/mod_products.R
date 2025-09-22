@@ -92,10 +92,8 @@ mod_products_ui <- function(id) {
           htmlOutput(ns("trd_stl"), container = tags$h3)
         ),
         col_3(
-          htmlOutput(ns("trd_stl_exp"), container = tags$h4),
-          htmlOutput(ns("trd_smr_exp"), container = tags$p),
-          htmlOutput(ns("trd_stl_imp"), container = tags$h4),
-          htmlOutput(ns("trd_smr_imp"), container = tags$p)
+          htmlOutput(ns("trd_stl_trade"), container = tags$h4),
+          htmlOutput(ns("trd_smr_trade"), container = tags$p)
         ),
         col_9(
           highchartOutput(ns("trd_exc_columns_agg"), height = "500px")
@@ -261,27 +259,13 @@ mod_products_server <- function(id) {
         }
       }
 
-      # For imports: use direct import data (more accurate from importer's perspective)
-      d_imp <- d_base %>%
+      # Use import data as measure of trade (more accurate from importer's perspective)
+      d <- d_base %>%
         group_by(!!sym("year")) %>%
         summarise(
           trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
           .groups = "drop"
-        )
-
-      # For exports: use import data as more accurate measure of global exports
-      # The principle: if country A imports product X, it means someone exported product X
-      # So sum of all imports = sum of all exports (more accurately measured)
-      d_exp <- d_base %>%
-        group_by(!!sym("year")) %>%
-        summarise(
-          trade_value_usd_exp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), # Use imports as proxy for exports
-          .groups = "drop"
-        )
-
-      # Combine the data
-      d <- d_imp %>%
-        left_join(d_exp, by = "year") %>%
+        ) %>%
         collect()
 
       if (inp_d() != "No") {
@@ -363,22 +347,10 @@ mod_products_server <- function(id) {
 
     tr_tbl_agg <- eventReactive(input$go, {
       df_agg() %>%
-        select(!!sym("year"), !!sym("trade_value_usd_exp"), !!sym("trade_value_usd_imp"))
+        select(!!sym("year"), !!sym("trade_value_usd_imp"))
     })
 
     ### Tables ----
-
-    exp_val_min_yr <- eventReactive(input$go, {
-      tr_tbl_agg() %>%
-        filter(!!sym("year") == min(inp_y())) %>%
-        pull(!!sym("trade_value_usd_exp"))
-    })
-
-    exp_val_max_yr <- eventReactive(input$go, {
-      tr_tbl_agg() %>%
-        filter(!!sym("year") == max(inp_y())) %>%
-        pull(!!sym("trade_value_usd_exp"))
-    })
 
     imp_val_min_yr <- eventReactive(input$go, {
       tr_tbl_agg() %>%
@@ -392,38 +364,12 @@ mod_products_server <- function(id) {
         pull(!!sym("trade_value_usd_imp"))
     })
 
-    exp_val_min_yr_2 <- eventReactive(input$go, {
-      show_dollars(exp_val_min_yr())
-    })
-
-    exp_val_max_yr_2 <- eventReactive(input$go, {
-      show_dollars(exp_val_max_yr())
-    })
-
     imp_val_min_yr_2 <- eventReactive(input$go, {
       show_dollars(imp_val_min_yr())
     })
 
     imp_val_max_yr_2 <- eventReactive(input$go, {
       show_dollars(imp_val_max_yr())
-    })
-
-    exports_growth <- eventReactive(input$go, {
-      growth_rate(
-        exp_val_max_yr(), exp_val_min_yr(), inp_y()
-      )
-    })
-
-    exports_growth_2 <- eventReactive(input$go, {
-      show_percentage(exports_growth())
-    })
-
-    exports_growth_increase_decrease <- eventReactive(input$go, {
-      ifelse(exports_growth() >= 0, "increased", "decreased")
-    })
-
-    exports_growth_increase_decrease_2 <- eventReactive(input$go, {
-      ifelse(exports_growth() >= 0, "increase", "decrease")
     })
 
     imports_growth <- eventReactive(input$go, {
@@ -446,51 +392,30 @@ mod_products_server <- function(id) {
 
     ### Text/Visual elements ----
 
-    trd_smr_txt_exp <- eventReactive(input$go, {
-      glue("The exports of { section_name() } { exports_growth_increase_decrease() } from
-           { exp_val_min_yr_2() } in { min(inp_y()) } to { exp_val_max_yr_2() } in { max(inp_y()) }
-           (annualized { exports_growth_increase_decrease_2() } of { exports_growth_2() }).")
-    })
-
-    trd_smr_txt_imp <- eventReactive(input$go, {
-      glue("The imports of { section_name() } { imports_growth_increase_decrease() } from
+    trd_smr_txt <- eventReactive(input$go, {
+      glue("The trade of { section_name() } { imports_growth_increase_decrease() } from
            { imp_val_min_yr_2() } in { min(inp_y()) } to { imp_val_max_yr_2() } in { max(inp_y()) }
            (annualized { imports_growth_increase_decrease_2() } of { imports_growth_2() }).")
     })
 
     trd_exc_columns_title <- eventReactive(input$go, {
-      glue("{ section_name() } exchange in { min(inp_y()) } and { max(inp_y()) }")
+      glue("{ section_name() } trade in { min(inp_y()) } and { max(inp_y()) }")
     })
 
     trd_exc_columns_agg <- reactive({
       d <- tr_tbl_agg()
 
       d <- tibble(
-        year = d$year,
-        trade = d$trade_value_usd_exp,
-        flow = "Exports"
-      ) %>%
-        bind_rows(
-          tibble(
-            year = d$year,
-            trade = d$trade_value_usd_imp,
-            flow = "Imports"
-          )
-        ) %>%
-        mutate(year = as.character(!!sym("year")))
-
-      # Create named color vector for proper mapping
-      flow_colors <- setNames(
-        c("#67c090", "#26667f"),
-        c("Exports", "Imports")
+        year = as.character(d$year),
+        trade = d$trade_value_usd_imp
       )
 
       wt$inc(1)
 
       hchart(d,
         "column",
-        hcaes(x = "year", y = "trade", group = "flow"),
-        color = flow_colors,
+        hcaes(x = "year", y = "trade"),
+        color = "#26667f",
         tooltip = list(
           pointFormatter = custom_tooltip_short()
         )
@@ -1012,18 +937,14 @@ mod_products_server <- function(id) {
     ### Trade ----
 
     output$trd_stl <- eventReactive(input$go, {
-      "Total multilateral Exports and Imports"
+      "Total multilateral Trade"
     })
 
-    output$trd_stl_exp <- eventReactive(input$go, {
-      "Exports"
-    })
-    output$trd_stl_imp <- eventReactive(input$go, {
-      "Imports"
+    output$trd_stl_trade <- eventReactive(input$go, {
+      "Trade Summary"
     })
 
-    output$trd_smr_exp <- renderText(trd_smr_txt_exp())
-    output$trd_smr_imp <- renderText(trd_smr_txt_imp())
+    output$trd_smr_trade <- renderText(trd_smr_txt())
 
     output$trd_exc_columns_agg <- renderHighchart({
       trd_exc_columns_agg()
