@@ -259,26 +259,72 @@ mod_countries_server <- function(id) {
     df_agg <- reactive({
       wt$notify(position = "br")
 
-      d <- tbl(con, tbl_agg)
+      d_base <- tbl(con, tbl_agg)
 
       if (inp_p() == "ALL") {
-        d <- d %>%
+        # For imports: use direct data (reporter's own records are more accurate)
+        d_imp <- d_base %>%
           filter(
             !!sym("year") %in% !!inp_y() &
               !!sym("reporter_iso") == !!inp_r()
           ) %>%
           group_by(!!sym("year"), !!sym("reporter_iso")) %>%
           summarise(
-            trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE),
             trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
             .groups = "drop"
           )
+
+        # For exports: use partners' import data (more accurate than direct export records)
+        # Get imports from all countries that report trading WITH our selected reporter
+        d_exp <- d_base %>%
+          filter(
+            !!sym("year") %in% !!inp_y() &
+              !!sym("partner_iso") == !!inp_r() # Countries that import FROM our reporter
+          ) %>%
+          group_by(!!sym("year"), !!sym("partner_iso")) %>%
+          summarise(
+            trade_value_usd_exp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), # Use their imports as our exports
+            .groups = "drop"
+          ) %>%
+          rename(!!sym("reporter_iso") := !!sym("partner_iso")) # Rename to match the import data structure
+
+        # Combine the two datasets
+        d <- d_imp %>%
+          left_join(d_exp, by = c("year", "reporter_iso")) %>%
+          mutate(
+            !!sym("trade_value_usd_exp") := ifelse(is.na(!!sym("trade_value_usd_exp")), 0, !!sym("trade_value_usd_exp")),
+            !!sym("trade_value_usd_imp") := ifelse(is.na(!!sym("trade_value_usd_imp")), 0, !!sym("trade_value_usd_imp"))
+          )
       } else {
-        d <- d %>%
+        # For bilateral trade, we still need to apply the same logic
+        # Imports: direct data from reporter
+        d_imp <- d_base %>%
           filter(
             !!sym("year") %in% !!inp_y() &
               !!sym("reporter_iso") == !!inp_r() &
               !!sym("partner_iso") == !!inp_p()
+          ) %>%
+          select(!!sym("year"), !!sym("reporter_iso"), !!sym("partner_iso"), !!sym("trade_value_usd_imp"))
+
+        # Exports: partner's import data (swap reporter and partner)
+        d_exp <- d_base %>%
+          filter(
+            !!sym("year") %in% !!inp_y() &
+              !!sym("reporter_iso") == !!inp_p() & # Partner as reporter
+              !!sym("partner_iso") == !!inp_r() # Our country as partner
+          ) %>%
+          select(!!sym("year"),
+            reporter_iso = !!sym("partner_iso"), # Swap back to our perspective
+            partner_iso = !!sym("reporter_iso"),
+            trade_value_usd_exp = !!sym("trade_value_usd_imp")
+          ) # Their imports = our exports
+
+        # Combine bilateral data
+        d <- d_imp %>%
+          left_join(d_exp, by = c("year", "reporter_iso", "partner_iso")) %>%
+          mutate(
+            !!sym("trade_value_usd_exp") := ifelse(is.na(!!sym("trade_value_usd_exp")), 0, !!sym("trade_value_usd_exp")),
+            !!sym("trade_value_usd_imp") := ifelse(is.na(!!sym("trade_value_usd_imp")), 0, !!sym("trade_value_usd_imp"))
           )
       }
 
@@ -296,29 +342,95 @@ mod_countries_server <- function(id) {
       bindEvent(input$go)
 
     df_dtl <- reactive({
-      d <- tbl(con, tbl_dtl)
+      d_base <- tbl(con, tbl_dtl)
+
+      # Get commodities reference data
+      commodities_ref <- tbl(con, "commodities") %>%
+        distinct(!!sym("commodity_code"), !!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short"), !!sym("commodity_name"))
 
       if (inp_p() == "ALL") {
-        d <- d %>%
+        # For imports: use direct data (reporter's own records are more accurate)
+        d_imp <- d_base %>%
           filter(
             !!sym("year") %in% !!inp_y() &
               !!sym("reporter_iso") == !!inp_r()
+          ) %>%
+          inner_join(commodities_ref, by = c("commodity_code", "section_code")) %>%
+          select(-!!sym("trade_value_usd_exp")) # Remove exports, we'll get them from partners
+
+        # For exports: use partners' import data (more accurate than direct export records)
+        # Get imports from all countries that report trading WITH our selected reporter
+        d_exp <- d_base %>%
+          filter(
+            !!sym("year") %in% !!inp_y() &
+              !!sym("partner_iso") == !!inp_r() # Countries that import FROM our reporter
+          ) %>%
+          inner_join(commodities_ref, by = c("commodity_code", "section_code")) %>%
+          select(-!!sym("trade_value_usd_exp")) %>% # Remove exports, we don't need them here
+          mutate(
+            !!sym("original_reporter") := !!sym("reporter_iso"), # Store original reporter
+            !!sym("reporter_iso") := !!sym("partner_iso"), # Swap perspective
+            !!sym("partner_iso") := !!sym("original_reporter"), # Complete the swap
+            !!sym("trade_value_usd_exp") := !!sym("trade_value_usd_imp") # Their imports = our exports
+          ) %>%
+          select(-!!sym("original_reporter"), -!!sym("trade_value_usd_imp")) # Remove temporary column and original imports
+
+        # Combine the datasets
+        d <- d_imp %>%
+          left_join(
+            d_exp,
+            by = c(
+              "year", "reporter_iso", "partner_iso", "commodity_code", "section_code",
+              "section_name", "section_color", "commodity_code_short", "commodity_name"
+            )
+          ) %>%
+          mutate(
+            !!sym("trade_value_usd_exp") := ifelse(is.na(!!sym("trade_value_usd_exp")), 0, !!sym("trade_value_usd_exp")),
+            !!sym("trade_value_usd_imp") := ifelse(is.na(!!sym("trade_value_usd_imp")), 0, !!sym("trade_value_usd_imp"))
           )
       } else {
-        d <- d %>%
+        # For bilateral trade, apply the same logic but for specific partner
+        # Imports: direct data from reporter
+        d_imp <- d_base %>%
           filter(
             !!sym("year") %in% !!inp_y() &
               !!sym("reporter_iso") == !!inp_r() &
               !!sym("partner_iso") == !!inp_p()
+          ) %>%
+          inner_join(commodities_ref, by = c("commodity_code", "section_code")) %>%
+          select(-!!sym("trade_value_usd_exp")) # Remove exports, we'll get them from partner
+
+        # Exports: partner's import data (swap reporter and partner)
+        d_exp <- d_base %>%
+          filter(
+            !!sym("year") %in% !!inp_y() &
+              !!sym("reporter_iso") == !!inp_p() & # Partner as reporter
+              !!sym("partner_iso") == !!inp_r() # Our country as partner
+          ) %>%
+          inner_join(commodities_ref, by = c("commodity_code", "section_code")) %>%
+          select(-!!sym("trade_value_usd_exp")) %>% # Remove exports, we don't need them
+          mutate(
+            !!sym("original_reporter") := !!sym("reporter_iso"), # Store original reporter
+            !!sym("reporter_iso") := !!sym("partner_iso"), # Swap back to our perspective
+            !!sym("partner_iso") := !!sym("original_reporter"), # Complete the swap
+            !!sym("trade_value_usd_exp") := !!sym("trade_value_usd_imp") # Their imports = our exports
+          ) %>%
+          select(-!!sym("original_reporter"), -!!sym("trade_value_usd_imp")) # Remove temporary column and original imports
+
+        # Combine bilateral data
+        d <- d_imp %>%
+          left_join(
+            d_exp,
+            by = c(
+              "year", "reporter_iso", "partner_iso", "commodity_code", "section_code",
+              "section_name", "section_color", "commodity_code_short", "commodity_name"
+            )
+          ) %>%
+          mutate(
+            !!sym("trade_value_usd_exp") := ifelse(is.na(!!sym("trade_value_usd_exp")), 0, !!sym("trade_value_usd_exp")),
+            !!sym("trade_value_usd_imp") := ifelse(is.na(!!sym("trade_value_usd_imp")), 0, !!sym("trade_value_usd_imp"))
           )
       }
-
-      d <- d %>%
-        inner_join(
-          tbl(con, "commodities") %>%
-            distinct(!!sym("commodity_code"), !!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short"), !!sym("commodity_name")),
-          by = c("commodity_code", "section_code")
-        )
 
       d <- collect(d)
 

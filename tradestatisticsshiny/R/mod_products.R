@@ -246,29 +246,42 @@ mod_products_server <- function(id) {
     df_agg <- reactive({
       wt$notify(position = "br")
 
-      # For products, we need to aggregate from the detailed yrc table
-      d <- tbl(con, "yrc") %>%
+      # Base data from yrc table
+      d_base <- tbl(con, "yrc") %>%
         filter(!!sym("year") %in% !!inp_y())
 
-      # Filter by section/commodity if specified
+      # Apply section/commodity filter if specified
       if (!is.null(inp_s()) && inp_s() != "") {
         if (nchar(inp_s()) == 4) {
-          d <- d %>%
+          d_base <- d_base %>%
             filter(substr(!!sym("commodity_code"), 1, 4) == !!inp_s())
         } else if (nchar(inp_s()) == 2) {
-          d <- d %>%
+          d_base <- d_base %>%
             filter(!!sym("section_code") == !!inp_s())
         }
       }
 
-      # Aggregate to year level for the selected products
-      d <- d %>%
+      # For imports: use direct import data (more accurate from importer's perspective)
+      d_imp <- d_base %>%
         group_by(!!sym("year")) %>%
         summarise(
-          trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE),
           trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
           .groups = "drop"
-        ) %>%
+        )
+
+      # For exports: use import data as more accurate measure of global exports
+      # The principle: if country A imports product X, it means someone exported product X
+      # So sum of all imports = sum of all exports (more accurately measured)
+      d_exp <- d_base %>%
+        group_by(!!sym("year")) %>%
+        summarise(
+          trade_value_usd_exp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), # Use imports as proxy for exports
+          .groups = "drop"
+        )
+
+      # Combine the data
+      d <- d_imp %>%
+        left_join(d_exp, by = "year") %>%
         collect()
 
       if (inp_d() != "No") {
@@ -283,29 +296,57 @@ mod_products_server <- function(id) {
       bindEvent(input$go)
 
     df_dtl <- reactive({
-      d <- tbl(con, "yrpc") %>%
+      # Base data from yrpc table
+      d_base <- tbl(con, "yrpc") %>%
         filter(!!sym("year") %in% !!inp_y())
 
-      # Filter by section/commodity if specified
+      # Apply section/commodity filter if specified
       if (!is.null(inp_s()) && inp_s() != "") {
         if (nchar(inp_s()) == 4) {
-          d <- d %>%
+          d_base <- d_base %>%
             filter(substr(!!sym("commodity_code"), 1, 4) == !!inp_s())
         } else if (nchar(inp_s()) == 2) {
-          d <- d %>%
+          d_base <- d_base %>%
             filter(!!sym("section_code") == !!inp_s())
         }
       }
 
-      # Join with commodities table to get product names and colors
-      d <- d %>%
-        inner_join(
-          tbl(con, "commodities") %>%
-            distinct(!!sym("commodity_code"), !!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short"), !!sym("commodity_name")),
-          by = c("commodity_code", "section_code")
-        )
+      # Get commodities reference data
+      commodities_ref <- tbl(con, "commodities") %>%
+        distinct(!!sym("commodity_code"), !!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("commodity_code_short"), !!sym("commodity_name"))
 
-      d <- collect(d)
+      # For imports: use direct import data (more accurate)
+      d_imp <- d_base %>%
+        inner_join(commodities_ref, by = c("commodity_code", "section_code")) %>%
+        select(-!!sym("trade_value_usd_exp")) # Remove exports, we'll calculate them differently
+
+      # For exports: use imports but swap reporter/partner perspective
+      # If country A reports importing product X from country B,
+      # then country B exported product X to country A
+      d_exp <- d_base %>%
+        inner_join(commodities_ref, by = c("commodity_code", "section_code")) %>%
+        mutate(
+          !!sym("original_reporter") := !!sym("reporter_iso"),
+          !!sym("reporter_iso") := !!sym("partner_iso"), # Swap perspective: partner becomes reporter
+          !!sym("partner_iso") := !!sym("original_reporter"), # Original reporter becomes partner
+          !!sym("trade_value_usd_exp") := !!sym("trade_value_usd_imp") # Their imports = exports from their partners
+        ) %>%
+        select(-!!sym("original_reporter"), -!!sym("trade_value_usd_imp"))
+
+      # Combine the datasets
+      d <- d_imp %>%
+        left_join(
+          d_exp,
+          by = c(
+            "year", "reporter_iso", "partner_iso", "commodity_code", "section_code",
+            "section_name", "section_color", "commodity_code_short", "commodity_name"
+          )
+        ) %>%
+        mutate(
+          !!sym("trade_value_usd_exp") := ifelse(is.na(!!sym("trade_value_usd_exp")), 0, !!sym("trade_value_usd_exp")),
+          !!sym("trade_value_usd_imp") := ifelse(is.na(!!sym("trade_value_usd_imp")), 0, !!sym("trade_value_usd_imp"))
+        ) %>%
+        collect()
 
       if (inp_d() != "No") {
         d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
@@ -730,31 +771,31 @@ mod_products_server <- function(id) {
 
     # Import column charts
     imp_col_min_yr_usd <- reactive({
-      # Use export flow (trade_value_usd_exp) and partner_iso to identify importers (more reliable)
+      # Use import flow (trade_value_usd_imp) and reporter_iso to identify importers (more reliable)
       d <- df_dtl() %>%
         filter(year == min(inp_y())) %>%
         inner_join(
           tbl(con, "countries") %>%
             select(!!sym("country_iso"), !!sym("country_name")) %>%
             collect(),
-          by = c("partner_iso" = "country_iso")
+          by = c("reporter_iso" = "country_iso")
         ) %>%
         group_by(!!sym("country_name")) %>%
-        summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
-        filter(!!sym("trade_value_usd_exp") > 0) %>%
+        summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+        filter(!!sym("trade_value_usd_imp") > 0) %>%
         mutate(country_name = fct_lump_n(
           f = !!sym("country_name"),
           n = 4,
-          w = !!sym("trade_value_usd_exp"),
+          w = !!sym("trade_value_usd_imp"),
           other_level = "Rest of the world"
         )) %>%
         group_by(!!sym("country_name")) %>%
-        summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
+        summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
         mutate(country_name = factor(!!sym("country_name"),
           levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
         ))
 
-      hchart(d, "column", hcaes(x = "country_name", y = "trade_value_usd_exp"),
+      hchart(d, "column", hcaes(x = "country_name", y = "trade_value_usd_imp"),
         color = "#518498",
         tooltip = list(pointFormatter = custom_tooltip_short())
       ) %>%
@@ -775,20 +816,20 @@ mod_products_server <- function(id) {
           tbl(con, "countries") %>%
             select(!!sym("country_iso"), !!sym("country_name")) %>%
             collect(),
-          by = c("partner_iso" = "country_iso")
+          by = c("reporter_iso" = "country_iso")
         ) %>%
         group_by(!!sym("country_name")) %>%
-        summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
-        filter(!!sym("trade_value_usd_exp") > 0) %>%
+        summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+        filter(!!sym("trade_value_usd_imp") > 0) %>%
         mutate(country_name = fct_lump_n(
           f = !!sym("country_name"),
           n = 4,
-          w = !!sym("trade_value_usd_exp"),
+          w = !!sym("trade_value_usd_imp"),
           other_level = "Rest of the world"
         )) %>%
         group_by(!!sym("country_name")) %>%
-        summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
-        mutate(percentage = round(100 * !!sym("trade_value_usd_exp") / sum(!!sym("trade_value_usd_exp")), 1)) %>%
+        summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+        mutate(percentage = round(100 * !!sym("trade_value_usd_imp") / sum(!!sym("trade_value_usd_imp")), 1)) %>%
         mutate(country_name = factor(!!sym("country_name"),
           levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
         ))
@@ -811,24 +852,24 @@ mod_products_server <- function(id) {
           tbl(con, "countries") %>%
             select(!!sym("country_iso"), !!sym("country_name")) %>%
             collect(),
-          by = c("partner_iso" = "country_iso")
+          by = c("reporter_iso" = "country_iso")
         ) %>%
         group_by(!!sym("country_name")) %>%
-        summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
-        filter(!!sym("trade_value_usd_exp") > 0) %>%
+        summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+        filter(!!sym("trade_value_usd_imp") > 0) %>%
         mutate(country_name = fct_lump_n(
           f = !!sym("country_name"),
           n = 4,
-          w = !!sym("trade_value_usd_exp"),
+          w = !!sym("trade_value_usd_imp"),
           other_level = "Rest of the world"
         )) %>%
         group_by(!!sym("country_name")) %>%
-        summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
+        summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
         mutate(country_name = factor(!!sym("country_name"),
           levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
         ))
 
-      hchart(d, "column", hcaes(x = "country_name", y = "trade_value_usd_exp"),
+      hchart(d, "column", hcaes(x = "country_name", y = "trade_value_usd_imp"),
         color = "#26667f",
         tooltip = list(pointFormatter = custom_tooltip_short())
       ) %>%
@@ -849,20 +890,20 @@ mod_products_server <- function(id) {
           tbl(con, "countries") %>%
             select(!!sym("country_iso"), !!sym("country_name")) %>%
             collect(),
-          by = c("partner_iso" = "country_iso")
+          by = c("reporter_iso" = "country_iso")
         ) %>%
         group_by(!!sym("country_name")) %>%
-        summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
-        filter(!!sym("trade_value_usd_exp") > 0) %>%
+        summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+        filter(!!sym("trade_value_usd_imp") > 0) %>%
         mutate(country_name = fct_lump_n(
           f = !!sym("country_name"),
           n = 4,
-          w = !!sym("trade_value_usd_exp"),
+          w = !!sym("trade_value_usd_imp"),
           other_level = "Rest of the world"
         )) %>%
         group_by(!!sym("country_name")) %>%
-        summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
-        mutate(percentage = round(100 * !!sym("trade_value_usd_exp") / sum(!!sym("trade_value_usd_exp")), 1)) %>%
+        summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+        mutate(percentage = round(100 * !!sym("trade_value_usd_imp") / sum(!!sym("trade_value_usd_imp")), 1)) %>%
         mutate(country_name = factor(!!sym("country_name"),
           levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
         ))
@@ -884,17 +925,17 @@ mod_products_server <- function(id) {
 
     imp_tm_dtl_min_yr <- reactive({
       # Aggregate by countries instead of products for country treemap
-      # Use export flow (trade_value_usd_exp) and partner_iso to identify importers (more reliable)
+      # Use import flow (trade_value_usd_imp) and reporter_iso to identify importers (more reliable)
       d <- df_dtl() %>%
         filter(!!sym("year") == min(inp_y())) %>%
-        group_by(!!sym("partner_iso")) %>%
-        summarise(trade_value = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
+        group_by(!!sym("reporter_iso")) %>%
+        summarise(trade_value = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
         # Join with countries table to get country names and continent info
         inner_join(
           tbl(con, "countries") %>%
             select(!!sym("country_iso"), !!sym("country_name"), !!sym("continent_name"), !!sym("continent_color")) %>%
             collect(),
-          by = c("partner_iso" = "country_iso")
+          by = c("reporter_iso" = "country_iso")
         )
 
       # Create continent colors dataset
@@ -916,17 +957,17 @@ mod_products_server <- function(id) {
 
     imp_tm_dtl_max_yr <- reactive({
       # Aggregate by countries instead of products for country treemap
-      # Use export flow (trade_value_usd_exp) and partner_iso to identify importers (more reliable)
+      # Use import flow (trade_value_usd_imp) and reporter_iso to identify importers (more reliable)
       d <- df_dtl() %>%
         filter(!!sym("year") == max(inp_y())) %>%
-        group_by(!!sym("partner_iso")) %>%
-        summarise(trade_value = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
+        group_by(!!sym("reporter_iso")) %>%
+        summarise(trade_value = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
         # Join with countries table to get country names and continent info
         inner_join(
           tbl(con, "countries") %>%
             select(!!sym("country_iso"), !!sym("country_name"), !!sym("continent_name"), !!sym("continent_color")) %>%
             collect(),
-          by = c("partner_iso" = "country_iso")
+          by = c("reporter_iso" = "country_iso")
         )
 
       # Create continent colors dataset

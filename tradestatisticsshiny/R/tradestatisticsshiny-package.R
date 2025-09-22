@@ -15,7 +15,7 @@
 #' @importFrom pool dbPool dbIsValid poolClose
 #' @importFrom purrr map_df
 #' @importFrom rio export
-#' @importFrom rlang sym
+#' @importFrom rlang sym `:=`
 #' @importFrom RPostgres Postgres
 #' @importFrom shiny NS tagList HTML fluidRow selectInput sliderInput actionButton
 #'     htmlOutput uiOutput h2 tags div moduleServer reactive eventReactive observe

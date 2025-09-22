@@ -4,7 +4,7 @@ available_formats <- function() {
 }
 
 #' SQL connection
-sql_con <- function() { 
+sql_con <- function() {
   dbPool(
     drv = Postgres(),
     dbname = Sys.getenv("TRADESTATISTICS_SQL_NAME"),
