@@ -247,7 +247,11 @@ mod_products_server <- function(id) {
 
       # Base data from yrc table
       d_base <- tbl(con, "yrc") %>%
-        filter(!!sym("year") %in% !!inp_y())
+        filter(!!sym("year") %in% !!inp_y()) %>%
+        filter(
+          !(!!sym("reporter_iso") %in% c("EUR", "MCO")) &
+          !(!!sym("partner_iso") %in% c("EUR", "MCO"))
+        )
 
       # Apply section/commodity filter if specified
       if (!is.null(inp_s()) && inp_s() != "") {
@@ -281,7 +285,11 @@ mod_products_server <- function(id) {
     df_dtl <- reactive({
       # Base data from yrpc table
       d_base <- tbl(con, "yrpc") %>%
-        filter(!!sym("year") %in% !!inp_y())
+        filter(!!sym("year") %in% !!inp_y()) %>%
+        filter(
+          !(!!sym("reporter_iso") %in% c("EUR", "MCO")) &
+          !(!!sym("partner_iso") %in% c("EUR", "MCO"))
+        )
 
       # Apply section/commodity filter if specified
       if (!is.null(inp_s()) && inp_s() != "") {
