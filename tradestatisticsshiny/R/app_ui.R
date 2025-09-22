@@ -16,7 +16,7 @@ app_ui <- function(request) {
       dashboardHeader(title = "Open Trade Statistics"),
       dashboardSidebar(
         useShinyjs(),
-        useWaitress(),
+        useWaiter(),
         sidebarMenu(
           menuItem("Welcome", tabName = "welcome"),
           menuItem("Countries", tabName = "co"),
@@ -74,11 +74,27 @@ golem_add_external_resources <- function() {
     app_sys("app/www")
   )
 
+  # Add JavaScript to add an id to the <section> tag 
+  # so we can overlay waiter on top of it
+  add_id_to_section <- "
+  $( document ).ready(function() {
+    var section = document.getElementsByClassName('content');
+    section[0].setAttribute('id', 'waiter-content');
+  });"
+
   tags$head(
     favicon(),
     bundle_resources(
       path = app_sys("app/www"),
       app_title = "Open Trade Statistics"
+    ),
+    tags$script(add_id_to_section),
+    tags$style(
+      ".waiter-overlay-content{
+        position: absolute;
+        top: 45vh;
+        left: 50%;
+      }"
     )
     # Add here other external resources
     # for example, you can add shinyalert::useShinyalert()

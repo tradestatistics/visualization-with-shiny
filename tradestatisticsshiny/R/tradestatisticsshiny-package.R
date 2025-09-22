@@ -25,7 +25,7 @@
 #' @importFrom shinyjs hide show useShinyjs
 #' @importFrom stats setNames
 #' @importFrom tidyr pivot_longer
-#' @importFrom waiter Waitress useWaitress
+#' @importFrom waiter useWaiter Waiter spin_3 transparent
 "_PACKAGE"
 
 styles <- list(

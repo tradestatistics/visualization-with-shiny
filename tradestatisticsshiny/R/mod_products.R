@@ -8,6 +8,7 @@
 mod_products_ui <- function(id) {
   ns <- NS(id)
   tagList(
+    useWaiter(),
     fluidRow(
       # Filter -----
       col_12(
@@ -239,10 +240,10 @@ mod_products_server <- function(id) {
 
     # Visualize ----
 
-    wt <- Waitress$new(theme = "overlay-percent", min = 0, max = 10)
+    w <- Waiter$new("waiter-content", color = transparent(.5), html = spin_3())
 
     df_agg <- reactive({
-      wt$notify(position = "br")
+      w$show()
 
       # Base data from yrc table
       d_base <- tbl(con, "yrc") %>%
@@ -271,8 +272,6 @@ mod_products_server <- function(id) {
       if (inp_d() != "No") {
         d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
       }
-
-      wt$inc(2.5)
 
       return(d)
     }) %>%
@@ -335,8 +334,6 @@ mod_products_server <- function(id) {
       if (inp_d() != "No") {
         d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
       }
-
-      wt$inc(2.5)
 
       return(d)
     }) %>%
@@ -409,8 +406,6 @@ mod_products_server <- function(id) {
         year = as.character(d$year),
         trade = d$trade_value_usd_imp
       )
-
-      wt$inc(1)
 
       hchart(d,
         "column",
@@ -630,8 +625,6 @@ mod_products_server <- function(id) {
         distinct() %>%
         arrange(!!sym("continent_name"))
 
-      wt$inc(1)
-
       od_to_highcharts(d, d2)
     }) %>%
       bindCache(inp_y(), inp_s(), inp_d()) %>%
@@ -661,8 +654,6 @@ mod_products_server <- function(id) {
         select(!!sym("continent_name"), country_color = !!sym("continent_color")) %>%
         distinct() %>%
         arrange(!!sym("continent_name"))
-
-      wt$inc(1)
 
       od_to_highcharts(d, d2)
     }) %>%
@@ -869,8 +860,6 @@ mod_products_server <- function(id) {
         distinct() %>%
         arrange(!!sym("continent_name"))
 
-      wt$inc(1)
-
       od_to_highcharts(d, d2)
     }) %>%
       bindCache(inp_y(), inp_s(), inp_d()) %>%
@@ -901,11 +890,9 @@ mod_products_server <- function(id) {
         distinct() %>%
         arrange(!!sym("continent_name"))
 
-      wt$inc(1)
-
       out <- od_to_highcharts(d, d2)
 
-      wt$close()
+      w$hide()
       return(out)
     }) %>%
       bindCache(inp_y(), inp_s(), inp_d()) %>%

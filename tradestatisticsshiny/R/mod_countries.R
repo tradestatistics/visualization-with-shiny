@@ -8,6 +8,7 @@
 mod_countries_ui <- function(id) {
   ns <- NS(id)
   tagList(
+    useWaiter(),
     fluidRow(
       # Filter -----
       col_12(
@@ -254,10 +255,10 @@ mod_countries_server <- function(id) {
 
     ## Data ----
 
-    wt <- Waitress$new(theme = "overlay-percent", min = 0, max = 10)
+    w <- Waiter$new("waiter-content", color = transparent(.5), html = spin_3())
 
     df_agg <- reactive({
-      wt$notify(position = "br")
+      w$show()
 
       d_base <- tbl(con, tbl_agg)
 
@@ -333,8 +334,6 @@ mod_countries_server <- function(id) {
       if (inp_d() != "No") {
         d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
       }
-
-      wt$inc(2.5)
 
       return(d)
     }) %>%
@@ -437,8 +436,6 @@ mod_countries_server <- function(id) {
       if (inp_d() != "No") {
         d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
       }
-
-      wt$inc(2.5)
 
       return(d)
     }) %>%
@@ -715,8 +712,6 @@ mod_countries_server <- function(id) {
     })
 
     trd_rankings_imp_share_max_yr_2 <- eventReactive(input$go, {
-      wt$inc(1)
-
       share_val <- trd_rankings_imp_share_max_yr()
       if (is.na(share_val) || share_val <= 0) {
         return("N/A")
@@ -1109,8 +1104,6 @@ mod_countries_server <- function(id) {
         c("#67c090", "#26667f"),
         c("Exports", "Imports")
       )
-
-      wt$inc(1)
 
       hchart(d,
         "column",
@@ -2118,11 +2111,9 @@ mod_countries_server <- function(id) {
 
       d2 <- p_colors(d, con = con)
 
-      wt$inc(3)
-
       out <- p_to_highcharts(d, d2)
 
-      wt$close()
+      w$hide()
       return(out)
     }) %>%
       bindCache(inp_y(), inp_r(), inp_p(), inp_d()) %>%
