@@ -9,8 +9,8 @@ sql_con <- function() {
     drv = Postgres(),
     dbname = Sys.getenv("TRADESTATISTICS_SQL_NAME"),
     host = Sys.getenv("TRADESTATISTICS_SQL_HOST"),
-    user = Sys.getenv("TRADESTATISTICS_SQL_USR"),
-    password = Sys.getenv("TRADESTATISTICS_SQL_PWD"),
+    user = Sys.getenv("TRADESTATISTICS_SQL_USER"),
+    password = Sys.getenv("TRADESTATISTICS_SQL_PASSWORD"),
     port = Sys.getenv("TRADESTATISTICS_SQL_PORT")
   )
 }
@@ -277,24 +277,6 @@ r_add_upp_the <- function(name = NULL) {
   }
   # Capitalize only the first letter ("The") rather than returning all caps
   paste0(toupper(substr(v, 1, 1)), tolower(substr(v, 2, nchar(v))))
-}
-
-#' Add definite article for partner names
-#'
-#' Grammar helper function that adds "the" for partner names that typically
-#' take the definite article (e.g., "United States", "Russian Federation").
-#'
-#' @param name Character string of the partner name
-#' @return Character string: "the" for names requiring the article, empty string otherwise
-p_add_the <- function(name = NULL) {
-  # same logic for partner names
-  if (is.null(name)) {
-    return("")
-  }
-  if (substr(name, 1, 6) == "United" || substr(name, 1, 3) == "USA" || substr(name, 1, 7) == "Russian") {
-    return("the")
-  }
-  ""
 }
 
 # FORMAT TEXTS ----

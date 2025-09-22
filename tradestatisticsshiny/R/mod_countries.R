@@ -246,7 +246,7 @@ mod_countries_server <- function(id) {
       if (inp_p() == "ALL") {
         glue("{ r_add_upp_the(rname()) } { rname() } multilateral trade between { min(inp_y()) } and { max(inp_y()) }")
       } else {
-        glue("{ r_add_upp_the(rname()) } { rname() } and { p_add_the(pname()) } { pname() } trade between { min(inp_y()) } and { max(inp_y()) }")
+        glue("{ r_add_upp_the(rname()) } { rname() } and { r_add_the(pname()) } { pname() } trade between { min(inp_y()) } and { max(inp_y()) }")
       }
     })
 
@@ -503,7 +503,7 @@ mod_countries_server <- function(id) {
     })
 
     exports_growth_2 <- eventReactive(input$go, {
-      show_percentage(exports_growth())
+      show_percentage(abs(exports_growth()))
     })
 
     exports_growth_increase_decrease <- eventReactive(input$go, {
@@ -521,7 +521,7 @@ mod_countries_server <- function(id) {
     })
 
     imports_growth_2 <- eventReactive(input$go, {
-      show_percentage(imports_growth())
+      show_percentage(abs(imports_growth()))
     })
 
     imports_growth_increase_decrease <- eventReactive(input$go, {
@@ -724,45 +724,366 @@ mod_countries_server <- function(id) {
       show_percentage(share_val)
     })
 
+    ### GDP Context Functions ----
+
+    # Get GDP data for the reporter country
+    gdp_data <- eventReactive(input$go, {
+      reporter <- inp_r()
+      years <- inp_y()
+      
+      tbl(con, "gdp") %>%
+        filter(
+          !!sym("country_iso") == !!reporter &
+            !!sym("year") %in% !!years
+        ) %>%
+        collect()
+    })
+
+    # Calculate trade as percentage of GDP for exports
+    exp_gdp_pct_min_yr <- eventReactive(input$go, {
+      gdp_val <- gdp_data() %>%
+        filter(!!sym("year") == min(inp_y())) %>%
+        pull(!!sym("gdp"))
+      
+      if (length(gdp_val) == 0 || is.na(gdp_val) || gdp_val <= 0) {
+        return(NA)
+      }
+      
+      exp_val <- exp_val_min_yr()
+      if (is.na(exp_val) || exp_val <= 0) {
+        return(NA)
+      }
+      
+      return(round((exp_val / gdp_val) * 100, 2))
+    })
+
+    exp_gdp_pct_max_yr <- eventReactive(input$go, {
+      gdp_val <- gdp_data() %>%
+        filter(!!sym("year") == max(inp_y())) %>%
+        pull(!!sym("gdp"))
+      
+      if (length(gdp_val) == 0 || is.na(gdp_val) || gdp_val <= 0) {
+        return(NA)
+      }
+      
+      exp_val <- exp_val_max_yr()
+      if (is.na(exp_val) || exp_val <= 0) {
+        return(NA)
+      }
+      
+      return(round((exp_val / gdp_val) * 100, 2))
+    })
+
+    # Calculate trade as percentage of GDP for imports
+    imp_gdp_pct_min_yr <- eventReactive(input$go, {
+      gdp_val <- gdp_data() %>%
+        filter(!!sym("year") == min(inp_y())) %>%
+        pull(!!sym("gdp"))
+      
+      if (length(gdp_val) == 0 || is.na(gdp_val) || gdp_val <= 0) {
+        return(NA)
+      }
+      
+      imp_val <- imp_val_min_yr()
+      if (is.na(imp_val) || imp_val <= 0) {
+        return(NA)
+      }
+      
+      return(round((imp_val / gdp_val) * 100, 2))
+    })
+
+    imp_gdp_pct_max_yr <- eventReactive(input$go, {
+      gdp_val <- gdp_data() %>%
+        filter(!!sym("year") == max(inp_y())) %>%
+        pull(!!sym("gdp"))
+      
+      if (length(gdp_val) == 0 || is.na(gdp_val) || gdp_val <= 0) {
+        return(NA)
+      }
+      
+      imp_val <- imp_val_max_yr()
+      if (is.na(imp_val) || imp_val <= 0) {
+        return(NA)
+      }
+      
+      return(round((imp_val / gdp_val) * 100, 2))
+    })
+
+    # Get total exports for bilateral context (when partner != "ALL")
+    total_exp_val_min_yr <- eventReactive(input$go, {
+      if (inp_p() == "ALL") {
+        return(exp_val_min_yr())
+      }
+      
+      # Get total exports for the year (all partners)
+      min_year <- min(inp_y())
+      reporter <- inp_r()
+      
+      d <- tbl(con, "yrp") %>%
+        filter(
+          !!sym("year") == !!min_year &
+            !!sym("reporter_iso") == !!reporter
+        ) %>%
+        summarise(total_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE)) %>%
+        collect()
+      
+      total_val <- d$total_exp
+      if (inp_d() != "No" && !is.na(total_val)) {
+        # Apply GDP deflator adjustment if needed
+        temp_df <- tibble(
+          year = min_year,
+          trade_value_usd_exp = total_val,
+          trade_value_usd_imp = 0
+        )
+        adjusted_df <- gdp_deflator_adjustment(temp_df, as.integer(inp_d()), con = con)
+        total_val <- adjusted_df$trade_value_usd_exp
+      }
+      
+      return(total_val)
+    })
+
+    total_exp_val_max_yr <- eventReactive(input$go, {
+      if (inp_p() == "ALL") {
+        return(exp_val_max_yr())
+      }
+      
+      # Get total exports for the year (all partners)
+      max_year <- max(inp_y())
+      reporter <- inp_r()
+      
+      d <- tbl(con, "yrp") %>%
+        filter(
+          !!sym("year") == !!max_year &
+            !!sym("reporter_iso") == !!reporter
+        ) %>%
+        summarise(total_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE)) %>%
+        collect()
+      
+      total_val <- d$total_exp
+      if (inp_d() != "No" && !is.na(total_val)) {
+        # Apply GDP deflator adjustment if needed
+        temp_df <- tibble(
+          year = max_year,
+          trade_value_usd_exp = total_val,
+          trade_value_usd_imp = 0
+        )
+        adjusted_df <- gdp_deflator_adjustment(temp_df, as.integer(inp_d()), con = con)
+        total_val <- adjusted_df$trade_value_usd_exp
+      }
+      
+      return(total_val)
+    })
+
+    # Calculate total exports as percentage of GDP for bilateral context
+    total_exp_gdp_pct_min_yr <- eventReactive(input$go, {
+      gdp_val <- gdp_data() %>%
+        filter(!!sym("year") == min(inp_y())) %>%
+        pull(!!sym("gdp"))
+      
+      if (length(gdp_val) == 0 || is.na(gdp_val) || gdp_val <= 0) {
+        return(NA)
+      }
+      
+      total_exp_val <- total_exp_val_min_yr()
+      if (is.na(total_exp_val) || total_exp_val <= 0) {
+        return(NA)
+      }
+      
+      return(round((total_exp_val / gdp_val) * 100, 2))
+    })
+
+    total_exp_gdp_pct_max_yr <- eventReactive(input$go, {
+      gdp_val <- gdp_data() %>%
+        filter(!!sym("year") == max(inp_y())) %>%
+        pull(!!sym("gdp"))
+      
+      if (length(gdp_val) == 0 || is.na(gdp_val) || gdp_val <= 0) {
+        return(NA)
+      }
+      
+      total_exp_val <- total_exp_val_max_yr()
+      if (is.na(total_exp_val) || total_exp_val <= 0) {
+        return(NA)
+      }
+      
+      return(round((total_exp_val / gdp_val) * 100, 2))
+    })
+
+    # Get total imports for bilateral context (when partner != "ALL")
+    total_imp_val_min_yr <- eventReactive(input$go, {
+      if (inp_p() == "ALL") {
+        return(imp_val_min_yr())
+      }
+      
+      # Get total imports for the year (all partners)
+      min_year <- min(inp_y())
+      reporter <- inp_r()
+      
+      d <- tbl(con, "yrp") %>%
+        filter(
+          !!sym("year") == !!min_year &
+            !!sym("reporter_iso") == !!reporter
+        ) %>%
+        summarise(total_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE)) %>%
+        collect()
+      
+      total_val <- d$total_imp
+      if (inp_d() != "No" && !is.na(total_val)) {
+        # Apply GDP deflator adjustment if needed
+        temp_df <- tibble(
+          year = min_year,
+          trade_value_usd_exp = 0,
+          trade_value_usd_imp = total_val
+        )
+        adjusted_df <- gdp_deflator_adjustment(temp_df, as.integer(inp_d()), con = con)
+        total_val <- adjusted_df$trade_value_usd_imp
+      }
+      
+      return(total_val)
+    })
+
+    total_imp_val_max_yr <- eventReactive(input$go, {
+      if (inp_p() == "ALL") {
+        return(imp_val_max_yr())
+      }
+      
+      # Get total imports for the year (all partners)
+      max_year <- max(inp_y())
+      reporter <- inp_r()
+      
+      d <- tbl(con, "yrp") %>%
+        filter(
+          !!sym("year") == !!max_year &
+            !!sym("reporter_iso") == !!reporter
+        ) %>%
+        summarise(total_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE)) %>%
+        collect()
+      
+      total_val <- d$total_imp
+      if (inp_d() != "No" && !is.na(total_val)) {
+        # Apply GDP deflator adjustment if needed
+        temp_df <- tibble(
+          year = max_year,
+          trade_value_usd_exp = 0,
+          trade_value_usd_imp = total_val
+        )
+        adjusted_df <- gdp_deflator_adjustment(temp_df, as.integer(inp_d()), con = con)
+        total_val <- adjusted_df$trade_value_usd_imp
+      }
+      
+      return(total_val)
+    })
+
+    # Calculate total imports as percentage of GDP for bilateral context
+    total_imp_gdp_pct_min_yr <- eventReactive(input$go, {
+      gdp_val <- gdp_data() %>%
+        filter(!!sym("year") == min(inp_y())) %>%
+        pull(!!sym("gdp"))
+      
+      if (length(gdp_val) == 0 || is.na(gdp_val) || gdp_val <= 0) {
+        return(NA)
+      }
+      
+      total_imp_val <- total_imp_val_min_yr()
+      if (is.na(total_imp_val) || total_imp_val <= 0) {
+        return(NA)
+      }
+      
+      return(round((total_imp_val / gdp_val) * 100, 2))
+    })
+
+    total_imp_gdp_pct_max_yr <- eventReactive(input$go, {
+      gdp_val <- gdp_data() %>%
+        filter(!!sym("year") == max(inp_y())) %>%
+        pull(!!sym("gdp"))
+      
+      if (length(gdp_val) == 0 || is.na(gdp_val) || gdp_val <= 0) {
+        return(NA)
+      }
+      
+      total_imp_val <- total_imp_val_max_yr()
+      if (is.na(total_imp_val) || total_imp_val <= 0) {
+        return(NA)
+      }
+      
+      return(round((total_imp_val / gdp_val) * 100, 2))
+    })
+
     ### Text/Visual elements ----
 
     trd_smr_txt_exp <- eventReactive(input$go, {
-      if (inp_p() == "ALL") {
-        glue("The exports of { r_add_the(rname()) } { rname() } to the World { exports_growth_increase_decrease() } from
-                            { exp_val_min_yr_2() } in { min(inp_y()) } to { exp_val_max_yr_2() } in { max(inp_y()) }
-                            (annualized { exports_growth_increase_decrease_2() } of { exports_growth_2() }).")
+      # Base text - more concise and readable
+      base_text <- if (inp_p() == "ALL") {
+        glue("{ r_add_upp_the(rname()) } { rname() }'s exports to the world { exports_growth_increase_decrease() } from { exp_val_min_yr_2() } in { min(inp_y()) } to { exp_val_max_yr_2() } in { max(inp_y()) } ({ exports_growth_2() } annual { exports_growth_increase_decrease_2() }).")
       } else {
-        glue("The exports of { r_add_the(rname()) } { rname() } to { p_add_the(pname()) } { pname() } { exports_growth_increase_decrease() } from
-                            { exp_val_min_yr_2() } in { min(inp_y()) }
-                            to { exp_val_max_yr_2() } in { max(inp_y()) } (annualized { exports_growth_increase_decrease_2() } of
-                            { exports_growth_2() }). { p_add_the(pname()) } { pname() } was the No. { trd_rankings_no_min_yr() } trading partner of
-            { r_add_the(rname()) } { rname() } in { min(inp_y()) } (represented { trd_rankings_exp_share_min_yr_2() } of its exports), and
-                            then { trd_rankings_remained() } No. { trd_rankings_no_max_yr() } in { max(inp_y()) } (represented { trd_rankings_exp_share_max_yr_2() }
-                            of its exports).")
+        # Split into two shorter sentences for better readability
+        main_sentence <- glue("{ r_add_upp_the(rname()) } { rname() }'s exports to { r_add_the(pname()) } { pname() } { exports_growth_increase_decrease() } from { exp_val_min_yr_2() } in { min(inp_y()) } to { exp_val_max_yr_2() } in { max(inp_y()) } ({ exports_growth_2() } annual { exports_growth_increase_decrease_2() }).")
+        ranking_sentence <- glue("{ r_add_upp_the(pname()) } { pname() } ranked No. { trd_rankings_no_min_yr() } in { min(inp_y()) } ({ trd_rankings_exp_share_min_yr_2() } of exports) and { trd_rankings_remained() } No. { trd_rankings_no_max_yr() } in { max(inp_y()) } ({ trd_rankings_exp_share_max_yr_2() }).")
+        paste(main_sentence, ranking_sentence)
       }
+      
+      # Add GDP context only if we have valid data
+      gdp_context <- ""
+      min_pct <- exp_gdp_pct_min_yr()
+      max_pct <- exp_gdp_pct_max_yr()
+      
+      if (!is.na(min_pct) && !is.na(max_pct) && min_pct > 0 && max_pct > 0) {
+        if (inp_p() == "ALL") {
+          # Multilateral: concise GDP context
+          gdp_context <- glue(" These exports were { min_pct }% of { r_add_the(rname()) } { rname() }'s GDP in { min(inp_y()) } and { max_pct }% in { max(inp_y()) }.")
+        } else {
+          # Bilateral: show bilateral exports as % of GDP, and total if significantly different
+          total_min_pct <- total_exp_gdp_pct_min_yr()
+          total_max_pct <- total_exp_gdp_pct_max_yr()
+          
+          if (!is.na(total_min_pct) && !is.na(total_max_pct) && total_min_pct > 0 && total_max_pct > 0) {
+            gdp_context <- glue(" This trade was { min_pct }% of { r_add_the(rname()) } { rname() }'s GDP in { min(inp_y()) } and { max_pct }% in { max(inp_y()) } (total exports: { total_min_pct }% and { total_max_pct }%).")
+          }
+        }
+      }
+      
+      paste0(base_text, gdp_context)
     })
 
     trd_smr_txt_imp <- eventReactive(input$go, {
-      if (inp_p() == "ALL") {
-        glue("The imports of { r_add_the(rname()) } { rname() } from the World { imports_growth_increase_decrease() } from
-                           { imp_val_min_yr_2() } in { min(inp_y()) } to { imp_val_max_yr_2() } in { max(inp_y()) }
-                           (annualized { imports_growth_increase_decrease_2() } of { imports_growth_2() }).")
+      # Base text - more concise and readable
+      base_text <- if (inp_p() == "ALL") {
+        glue("{ r_add_upp_the(rname()) } { rname() }'s imports from the world { imports_growth_increase_decrease() } from { imp_val_min_yr_2() } in { min(inp_y()) } to { imp_val_max_yr_2() } in { max(inp_y()) } ({ imports_growth_2() } annual { imports_growth_increase_decrease_2() }).")
       } else {
-        glue("The imports of { r_add_the(rname()) } { rname() } from { p_add_the(pname()) } { pname() } { imports_growth_increase_decrease() } from
-                            { imp_val_min_yr_2() } in { min(inp_y()) }
-                            to { imp_val_max_yr_2() } in { max(inp_y()) } (annualized { imports_growth_increase_decrease_2() } of
-                            { imports_growth_2() }). { p_add_the(pname()) } { pname() } was the No. { trd_rankings_no_min_yr() } trading partner of
-            { r_add_the(rname()) } { rname() } in { min(inp_y()) } (represented { trd_rankings_imp_share_min_yr_2() } of its imports), and
-                            then { trd_rankings_remained() } No. { trd_rankings_no_max_yr() } in { max(inp_y()) } (represented { trd_rankings_imp_share_max_yr_2() }
-                            of its imports).")
+        # Split into two shorter sentences for better readability
+        main_sentence <- glue("{ r_add_upp_the(rname()) } { rname() }'s imports from { r_add_the(pname()) } { pname() } { imports_growth_increase_decrease() } from { imp_val_min_yr_2() } in { min(inp_y()) } to { imp_val_max_yr_2() } in { max(inp_y()) } ({ imports_growth_2() } annual { imports_growth_increase_decrease_2() }).")
+        ranking_sentence <- glue("{ r_add_upp_the(pname()) } { pname() } ranked No. { trd_rankings_no_min_yr() } in { min(inp_y()) } ({ trd_rankings_imp_share_min_yr_2() } of imports) and { trd_rankings_remained() } No. { trd_rankings_no_max_yr() } in { max(inp_y()) } ({ trd_rankings_imp_share_max_yr_2() }).")
+        paste(main_sentence, ranking_sentence)
       }
+      
+      # Add GDP context only if we have valid data
+      gdp_context <- ""
+      min_pct <- imp_gdp_pct_min_yr()
+      max_pct <- imp_gdp_pct_max_yr()
+      
+      if (!is.na(min_pct) && !is.na(max_pct) && min_pct > 0 && max_pct > 0) {
+        if (inp_p() == "ALL") {
+          # Multilateral: concise GDP context
+          gdp_context <- glue(" These imports were { min_pct }% of GDP in { min(inp_y()) } and { max_pct }% in { max(inp_y()) }.")
+        } else {
+          # Bilateral: show bilateral imports as % of GDP, and total if significantly different
+          total_min_pct <- total_imp_gdp_pct_min_yr()
+          total_max_pct <- total_imp_gdp_pct_max_yr()
+          
+          if (!is.na(total_min_pct) && !is.na(total_max_pct) && total_min_pct > 0 && total_max_pct > 0) {
+            gdp_context <- glue(" This trade was { min_pct }% of GDP in { min(inp_y()) } and { max_pct }% in { max(inp_y()) } (total imports: { total_min_pct }% and { total_max_pct }%).")
+          }
+        }
+      }
+      
+      paste0(base_text, gdp_context)
     })
 
     trd_exc_columns_title <- eventReactive(input$go, {
       if (inp_p() == "ALL") {
         glue("{ r_add_upp_the(rname()) } { rname() } multilateral trade between { min(inp_y()) } and { max(inp_y()) }")
       } else {
-        glue("{ r_add_upp_the(rname()) } { rname() } and { p_add_the(pname()) } { pname() } exchange between { min(inp_y()) } and { max(inp_y()) }")
+        glue("{ r_add_upp_the(rname()) } { rname() } and { r_add_the(pname()) } { pname() } exchange between { min(inp_y()) } and { max(inp_y()) }")
       }
     })
 
@@ -819,7 +1140,7 @@ mod_countries_server <- function(id) {
       if (inp_p() == "ALL") {
         glue("Exports of { r_add_the(rname()) } { rname() } to the rest of the World in { min(inp_y()) } and { max(inp_y()) }, by product")
       } else {
-        glue("Exports of { r_add_the(rname()) } { rname() } to { p_add_the(pname()) } { pname() } in { min(inp_y()) } and { max(inp_y()) }, by product")
+        glue("Exports of { r_add_the(rname()) } { rname() } to { r_add_the(pname()) } { pname() } in { min(inp_y()) } and { max(inp_y()) }, by product")
       }
     })
 
@@ -1340,7 +1661,7 @@ mod_countries_server <- function(id) {
       if (inp_p() == "ALL") {
         glue("Imports of { r_add_the(rname()) } { rname() } from the rest of the World in { min(inp_y()) } and { max(inp_y()) }, by product")
       } else {
-        glue("Imports of { r_add_the(rname()) } { rname() } from { p_add_the(pname()) } { pname() } in { min(inp_y()) } and { max(inp_y()) }, by product")
+        glue("Imports of { r_add_the(rname()) } { rname() } from { r_add_the(pname()) } { pname() } in { min(inp_y()) } and { max(inp_y()) }, by product")
       }
     })
 

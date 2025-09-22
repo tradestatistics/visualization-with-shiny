@@ -34,7 +34,7 @@ app_server <- function(input, output, session) {
     # strip shiny related URL parameters
     rvtl(input)
     setBookmarkExclude(c(
-      "shinyhelper-modal_params", "own", "sidebarCollapsed", "sidebarItemExpanded", "countries-fmt"
+      "shinyhelper-modal_params", "own", "sidebarCollapsed", "sidebarItemExpanded", "co-fmt", "pr-fmt"
     ))
     session$doBookmark()
   })
