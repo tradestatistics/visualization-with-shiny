@@ -269,10 +269,6 @@ mod_countries_server <- function(id) {
             !!sym("year") %in% !!inp_y() &
               !!sym("reporter_iso") == !!inp_r()
           ) %>%
-          filter(
-            !(!!sym("reporter_iso") %in% c("EUR", "MCO")) &
-            !(!!sym("partner_iso") %in% c("EUR", "MCO"))
-          ) %>%
           group_by(!!sym("year"), !!sym("reporter_iso")) %>%
           summarise(
             trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
@@ -285,10 +281,6 @@ mod_countries_server <- function(id) {
           filter(
             !!sym("year") %in% !!inp_y() &
               !!sym("partner_iso") == !!inp_r() # Countries that import FROM our reporter
-          ) %>%
-          filter(
-            !(!!sym("reporter_iso") %in% c("EUR", "MCO")) &
-            !(!!sym("partner_iso") %in% c("EUR", "MCO"))
           ) %>%
           group_by(!!sym("year"), !!sym("partner_iso")) %>%
           summarise(
@@ -313,10 +305,6 @@ mod_countries_server <- function(id) {
               !!sym("reporter_iso") == !!inp_r() &
               !!sym("partner_iso") == !!inp_p()
           ) %>%
-          filter(
-            !(!!sym("reporter_iso") %in% c("EUR", "MCO")) &
-            !(!!sym("partner_iso") %in% c("EUR", "MCO"))
-          ) %>%
           select(!!sym("year"), !!sym("reporter_iso"), !!sym("partner_iso"), !!sym("trade_value_usd_imp"))
 
         # Exports: partner's import data (swap reporter and partner)
@@ -325,10 +313,6 @@ mod_countries_server <- function(id) {
             !!sym("year") %in% !!inp_y() &
               !!sym("reporter_iso") == !!inp_p() & # Partner as reporter
               !!sym("partner_iso") == !!inp_r() # Our country as partner
-          ) %>%
-          filter(
-            !(!!sym("reporter_iso") %in% c("EUR", "MCO")) &
-            !(!!sym("partner_iso") %in% c("EUR", "MCO"))
           ) %>%
           select(!!sym("year"),
             reporter_iso = !!sym("partner_iso"), # Swap back to our perspective
