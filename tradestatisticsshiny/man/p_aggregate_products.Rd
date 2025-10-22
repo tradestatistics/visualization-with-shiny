@@ -2,7 +2,7 @@
 % Please edit documentation in R/golem_utils_server.R
 \name{p_aggregate_products}
 \alias{p_aggregate_products}
-\title{Aggregate Products (For Highcharter Visuals)}
+\title{Aggregate Products}
 \usage{
 p_aggregate_products(d, con)
 }
@@ -12,5 +12,5 @@ p_aggregate_products(d, con)
 \item{con}{SQL connection}
 }
 \description{
-Aggregate Products (For Highcharter Visuals)
+Aggregate Products
 }

@@ -2,7 +2,7 @@
 % Please edit documentation in R/golem_utils_server.R
 \name{p_aggregate_by_section}
 \alias{p_aggregate_by_section}
-\title{Add Percentages to Sections (For Highcharter Visuals)}
+\title{Add Percentages to Sections}
 \usage{
 p_aggregate_by_section(d, col, con)
 }
@@ -14,5 +14,5 @@ p_aggregate_by_section(d, col, con)
 \item{con}{SQL connection}
 }
 \description{
-Add Percentages to Sections (For Highcharter Visuals)
+Add Percentages to Sections
 }

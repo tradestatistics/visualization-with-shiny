@@ -9,108 +9,84 @@ sql_con <- function() {
     drv = Postgres(),
     dbname = Sys.getenv("TRADESTATISTICS_SQL_NAME"),
     host = Sys.getenv("TRADESTATISTICS_SQL_HOST"),
-    user = Sys.getenv("TRADESTATISTICS_SQL_USER"),
-    password = Sys.getenv("TRADESTATISTICS_SQL_PASSWORD"),
-    port = Sys.getenv("TRADESTATISTICS_SQL_PORT")
+  user = Sys.getenv("TRADESTATISTICS_SQL_USER"),
+  password = Sys.getenv("TRADESTATISTICS_SQL_PASSWORD"),
+  port = Sys.getenv("TRADESTATISTICS_SQL_PORT")
   )
+}
+
+# TIME ----
+
+get_year <- function() {
+  as.numeric(format(Sys.Date(), "%Y"))
 }
 
 # ORIGIN/DESTINATION TREEMAPS -----
 
-lvl_opts <- list(
-  list(
-    level = 1,
-    borderWidth = 1,
-    borderColor = "transparent",
-    colorVariation = list(key = "brightness", to = 0.25),
-    dataLabels = list(
-      enabled = TRUE,
-      align = "left",
-      verticalAlign = "top",
-      style = list(
-        fontSize = "14px",
-        fontWeight = "600",
-        textOutline = FALSE
-      )
-    )
-  ),
-  list(
-    level = 2,
-    borderWidth = 1,
-    borderColor = "transparent",
-    colorVariation = list(key = "brightness", to = 1),
-    dataLabels = list(enabled = FALSE),
-    style = list(
-      fontSize = "14px",
-      fontWeight = "600",
-      textOutline = FALSE
-    )
-  )
-)
-
-
-#' Custom Tooltip (For Highcharter Visuals)
-custom_tooltip <- function() {
-  JS("function() {\n                var raw = (this.point && this.point.raw_value != null) ? this.point.raw_value : this.value;\n                return '<b>' + this.name + '</b>' + '<br>' +\n                       'Share: ' + Math.round(raw / this.series.tree.val * 10000)/100 + '%' + '<br>' +\n                       'Value: ' + Highcharts.numberFormat(raw, 0) + ' USD'\n                       }")
-}
-
-#' Custom Short Tooltip (For Highcharter Visuals)
-custom_tooltip_short <- function() {
-  JS("function() { return '<b>' + this.series.name + '</b>' + ' ' +
-     Highcharts.numberFormat(this.y, 0) + ' USD' }")
-}
-
-#' Custom Data Labels (For Highcharter Visuals)
-data_labels <- function() {
-  JS("function() { return this.key + '<br>' + Math.round(this.point.value / this.point.series.tree.val * 10000 ) / 100 + '%'}")
-}
-
-#' Origin-Destination to Highcharter (For Highcharter Visuals)
+#' Origin-Destination Treemap
 #' @param d input dataset for values
 #' @param d2 input dataset for colours
-od_to_highcharts <- function(d, d2) {
+od_treemap <- function(d, d2) {
   dd <- d %>%
-    mutate(continent_name = factor(!!sym("continent_name"), levels = d2$continent_name)) %>%
+    mutate(
+      continent_name = factor(!!sym("continent_name"),
+        levels = d2$continent_name
+      )
+    ) %>%
     arrange(!!sym("continent_name"))
 
   new_lvls <- dd %>%
     group_by(!!sym("continent_name"), !!sym("country_name")) %>%
     summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop") %>%
-    ungroup() %>%
     mutate_if(is.factor, as.character) %>%
     arrange(desc(!!sym("trade_value"))) %>%
     distinct(!!sym("continent_name")) %>%
     pull(!!sym("continent_name"))
 
   new_colors <- d2 %>%
-    mutate(continent_name = factor(!!sym("continent_name"),
-      levels = new_lvls
-    )) %>%
+    mutate(
+      continent_name = factor(!!sym("continent_name"),
+        levels = new_lvls
+      )
+    ) %>%
     arrange(!!sym("continent_name")) %>%
     pull(!!sym("country_color"))
 
-  els <- data_to_hierarchical(dd, c("continent_name", "country_name"), "trade_value",
-    colors = new_colors
-  )
+  dd <- dd %>%
+    group_by(!!sym("continent_name"), !!sym("country_name")) %>%
+    summarise(trade_value = sum(!!sym("trade_value"), na.rm = TRUE), .groups = "drop") %>%
+    left_join(
+      d2 %>%
+        rename(color = !!sym("country_color")),
+      by = "continent_name"
+    )
 
-  lopts <- getOption("highcharter.lang")
-  lopts$thousandsSep <- ","
-  options(highcharter.lang = lopts)
-
-  hchart(
-    els,
-    type = "treemap",
-    levelIsConstant = FALSE,
-    allowDrillToNode = TRUE,
-    levels = lvl_opts,
-    tooltip = list(pointFormatter = custom_tooltip()),
-    dataLabels = list(formatter = data_labels())
-  )
+  d3po(dd) %>%
+    po_treemap(
+      daes(
+        size = .data$trade_value,
+        group = .data$continent_name,
+        subgroup = .data$country_name,
+        color = .data$color,
+        tiling = "binary"
+      )
+    ) %>%
+    po_labels(
+      align = "left-top",
+      title = NULL
+      # subtitle = JS(
+      #   "function(_v, row) { if (row && row.mode === 'drilled') return 'Displaying Sub-Group'; return 'Displaying Group'; }"
+      # )
+    ) %>%
+    # po_tooltip(JS(
+    #   "function(percentage, row) {\n       var pct = (percentage).toFixed(1) + '%';\n\n       // Minimal tooltip: rely on row.trade_value / row.count and explicit row.group / row.subgroup fields\n       var value = row && (row.trade_value != null ? row.trade_value : (row.count != null ? row.count : ''));\n\n       // If there's no subgroup (level-2) show only the group\n       if (!row || !row.subgroup) {\n         var g = row && (row.group || row.name) ? (row.group || row.name) : '';\n         return '<i>' + g + '</i><br/>Value: ' + value + '<br/>Percentage: ' + pct;\n       }\n\n       // When subgroup is present but equals the placeholder 'only', hide the subgroup row in tooltip\n       if (row.subgroup === 'only') {\n         return '<i>' + (row.group || '') + '</i><br/>Value: ' + value + '<br/>Percentage: ' + pct;\n       }\n\n       return '<i>' + (row.group || '') + ' — ' + (row.subgroup || '') + '</i><br/>Value: ' + value + '<br/>Percentage: ' + pct;\n     }"
+    # )) %>%
+    po_background("transparent")
 }
 
 # PRODUCT TREEMAPS ----
 
-#' Add Percentages to Sections (For Highcharter Visuals)
+#' Add Percentages to Sections
 #' @param d input dataset
 #' @param col column to collapse
 #' @param con SQL connection
@@ -149,7 +125,7 @@ p_aggregate_by_section <- function(d, col, con) {
   return(d)
 }
 
-#' Colorize Products (For Highcharter Visuals)
+#' Colorize Products
 #' @param d input dataset
 #' @param con SQL connection
 p_colors <- function(d, con) {
@@ -168,7 +144,7 @@ p_colors <- function(d, con) {
     )
 }
 
-#' Aggregate Products (For Highcharter Visuals)
+#' Aggregate Products
 #' @param d input dataset
 #' @param con SQL connection
 p_aggregate_products <- function(d, con) {
@@ -197,10 +173,10 @@ p_aggregate_products <- function(d, con) {
     ungroup()
 }
 
-#' Product to Highcharter (For Highcharter Visuals)
+#' Product Treemap
 #' @param d input dataset for values
 #' @param d2 input dataset for colours
-p_to_highcharts <- function(d, d2) {
+p_treemap <- function(d, d2, title = NULL) {
   dd <- d %>%
     mutate(section_name = factor(!!sym("section_name"), levels = d2$section_name)) %>%
     arrange(!!sym("section_name"))
@@ -211,7 +187,6 @@ p_to_highcharts <- function(d, d2) {
       trade_value = sum(!!sym("trade_value"), na.rm = TRUE),
       .groups = "drop"
     ) %>%
-    ungroup() %>%
     mutate_if(is.factor, as.character) %>%
     arrange(desc(!!sym("trade_value"))) %>%
     distinct(!!sym("section_name")) %>%
@@ -222,27 +197,111 @@ p_to_highcharts <- function(d, d2) {
     arrange(!!sym("section_name")) %>%
     pull(!!sym("section_color"))
 
-  els <- data_to_hierarchical(dd, c("section_name", "commodity_name"), "trade_value",
-    colors = new_colors
-  )
+  dd <- dd %>%
+    group_by(!!sym("section_name"), !!sym("commodity_name")) %>%
+    summarise(
+      trade_value = sum(!!sym("trade_value"), na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    left_join(d2 %>% rename(color = !!sym("section_color")), by = "section_name") %>%
+    ungroup()
 
-  lopts <- getOption("highcharter.lang")
-  lopts$thousandsSep <- ","
-  options(highcharter.lang = lopts)
+  d3po(dd) %>%
+    po_treemap(
+      daes(
+        size = .data$trade_value,
+        group = .data$section_name,
+        subgroup = .data$commodity_name,
+        color = .data$color,
+        tiling = "binary"
+      )
+    ) %>%
+    po_labels(
+      align = "left-top",
+      title = title,
+      subtitle = JS(
+        "function(_v, row) {
+          if (row && row.mode === 'drilled') {
+            return 'Displaying Commodities';
+          } else {
+            return 'Displaying Sections';
+          }
+        }"
+      ),
+      labels = JS(
+        "function(percentage, row) {
+          // format percentage with two decimals
+          var pct = (percentage).toFixed(2) + '%';
 
-  hchart(
-    els,
-    type = "treemap",
-    levelIsConstant = FALSE,
-    allowDrillToNode = TRUE,
-    levels = lvl_opts,
-    tooltip = list(
-      pointFormatter = custom_tooltip()
-    ),
-    dataLabels = list(
-      formatter = data_labels()
-    )
-  )
+          function stripZeros(s) {
+            if (s.slice(-3) === '.00') return s.slice(0, -3);
+            if (s.slice(-2) === '.0') return s.slice(0, -2);
+            return s;
+          }
+
+          function formatBillion(v) {
+            var s = (Number(v) / 1e9).toFixed(2);
+            return stripZeros(s) + 'B';
+          }
+
+          // prefer row.group/row.subgroup fields from the d3po/po_treemap internals
+          var section = (row && (row.group || row.section_name || row.name)) ? (row.group || row.section_name || row.name) : '';
+          var commodity = (row && (row.subgroup || row.commodity_name)) ? (row.subgroup || row.commodity_name) : '';
+          var rawValue = row && (row.trade_value != null ? row.trade_value : (row.count != null ? row.count : (row.value != null ? row.value : '')));
+          var value = formatBillion(rawValue);
+
+          // If no subgroup present (level 1), show only the section
+          if (!row || !commodity) {
+            return section + '<br/>' + value + '<br/>' + pct;
+          }
+
+          // Level 2: show commodity only (not repeated section + commodity)
+          return commodity + '<br/>' + value + '<br/>' + pct;
+        }"
+      )
+    ) %>%
+    po_tooltip(JS(
+      "function(percentage, row) {
+        var pct = (percentage).toFixed(2) + '%';
+
+        // tooltip formatter: duplicate the same formatter used by labels to avoid R escaping issues
+        var forceBillions = true;
+        function formatNumber(v) {
+          if (v === null || v === undefined || v === '') return '';
+          var n = Number(v);
+          if (isNaN(n)) return String(v);
+          var abs = Math.abs(n);
+          function stripZeros(s) {
+            if (s.slice(-3) === '.00') return s.slice(0, -3);
+            if (s.slice(-2) === '.0') return s.slice(0, -2);
+            return s;
+          }
+          if (forceBillions) {
+            var s = (n / 1e9).toFixed(2);
+            return stripZeros(s) + 'B';
+          }
+          if (abs >= 1e9) { var s = (n / 1e9).toFixed(2); return stripZeros(s) + 'B'; }
+          if (abs >= 1e6) { var s = (n / 1e6).toFixed(2); return stripZeros(s) + 'M'; }
+          if (abs >= 1e3) { var s = (n / 1e3).toFixed(1); return stripZeros(s) + 'k'; }
+          return n.toLocaleString(undefined, {maximumFractionDigits: 2});
+        }
+
+        // prefer row.group/row.subgroup fields from the d3po/po_treemap internals
+        var section = (row && (row.group || row.section_name || row.name)) ? (row.group || row.section_name || row.name) : '';
+        var commodity = (row && (row.subgroup || row.commodity_name)) ? (row.subgroup || row.commodity_name) : '';
+        var raw = row && (row.trade_value != null ? row.trade_value : (row.count != null ? row.count : (row.value != null ? row.value : '')));
+        var value = formatNumber(raw);
+
+        // If no subgroup present (level 1), show only the section
+        if (!row || !commodity) {
+          return '<b>' + section + '</b><br/>Value: ' + value + '<br/>Percentage: ' + pct;
+        }
+
+        // Level 2: show commodity only (not repeated section + commodity)
+        return '<b>' + commodity + '</b><br/>Value: ' + value + '<br/>Percentage: ' + pct;
+      }"
+    )) %>%
+    po_background("transparent")
 }
 
 #' Add definite article for reporter names

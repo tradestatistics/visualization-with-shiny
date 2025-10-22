@@ -2,7 +2,7 @@
 % Please edit documentation in R/golem_utils_server.R
 \name{p_colors}
 \alias{p_colors}
-\title{Colorize Products (For Highcharter Visuals)}
+\title{Colorize Products}
 \usage{
 p_colors(d, con)
 }
@@ -12,5 +12,5 @@ p_colors(d, con)
 \item{con}{SQL connection}
 }
 \description{
-Colorize Products (For Highcharter Visuals)
+Colorize Products
 }

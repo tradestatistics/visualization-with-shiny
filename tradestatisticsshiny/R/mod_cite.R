@@ -64,15 +64,15 @@ mod_cite_server <- function(id) {
     output$citation_bibtex <- renderUI({
       tags$pre(
         glue::glue(
-          "@misc{{vargas_sepulveda_open_{lubridate::year(Sys.Date())},
+          "@misc{{vargas_sepulveda_open_{ get_year() },
   title = {{Open Trade Statistics}},
   url = {{{site_url}}},
   author = {{{author_name_bib}}},
   doi = {{{doi}}},
   publisher = {{Open Trade Statistics}},
-  year = {{{lubridate::year(Sys.Date())}}},
-  month = {{{tolower(format(Sys.Date(), '%b'))}}},
-  note = {{Accessed: {format(Sys.Date(), '%B %d, %Y')}}}
+  year = {{{ get_year() }}},
+  month = {{{ tolower(format(Sys.Date(), '%b')) }}},
+  note = {{Accessed: { format(Sys.Date(), '%B %d, %Y') }}}
 }}"
         )
       )

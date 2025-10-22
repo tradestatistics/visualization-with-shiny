@@ -7,15 +7,12 @@
 #' @importFrom forcats fct_lump_n
 #' @importFrom glue glue
 #' @importFrom golem add_resource_path activate_js favicon bundle_resources with_golem_options
-#' @importFrom highcharter hcaes hchart hc_title hc_xAxis hc_yAxis JS renderHighchart
-#'     hc_legend highchartOutput data_to_hierarchical
+#' @importFrom htmlwidgets JS
 #' @importFrom jsonlite toJSON
-#' @importFrom lubridate day year
-#' @importFrom magrittr %>%
 #' @importFrom pool dbPool dbIsValid poolClose
 #' @importFrom purrr map_df
 #' @importFrom rio export
-#' @importFrom rlang sym `:=`
+#' @importFrom rlang sym `:=` .data
 #' @importFrom RPostgres Postgres
 #' @importFrom shiny NS tagList HTML fluidRow selectInput sliderInput actionButton
 #'     htmlOutput uiOutput h2 tags div moduleServer reactive eventReactive observe
@@ -27,11 +24,6 @@
 #' @importFrom tidyr pivot_longer
 #' @importFrom waiter useWaiter Waiter spin_3 transparent
 "_PACKAGE"
-
-styles <- list(
-  skin_color = "blue",
-  css_files = "custom.css"
-)
 
 shinyOptions(
   cache = cache_disk(

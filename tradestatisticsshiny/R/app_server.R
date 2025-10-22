@@ -21,12 +21,6 @@ app_server <- function(input, output, session) {
     }
   })
 
-  # Footer ----
-
-  output$site_footer <- renderText({
-    glue("<center><i>Open Trade Statistics {year(Sys.Date())}.</i></center>")
-  })
-
   # Bookmarking ----
 
   observe({

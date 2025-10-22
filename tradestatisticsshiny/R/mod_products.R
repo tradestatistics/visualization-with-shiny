@@ -97,7 +97,7 @@ mod_products_ui <- function(id) {
           htmlOutput(ns("trd_smr_trade"), container = tags$p)
         ),
         col_9(
-          highchartOutput(ns("trd_exc_columns_agg"), height = "500px")
+          d3po_output(ns("trd_exc_columns_agg"), height = "500px")
         )
       ),
 
@@ -110,54 +110,54 @@ mod_products_ui <- function(id) {
         ),
         col_6(
           htmlOutput(ns("exp_col_min_yr_usd_tt"), container = tags$h4),
-          highchartOutput(ns("exp_col_min_yr_usd"), height = "400px")
+          d3po_output(ns("exp_col_min_yr_usd"), height = "400px")
         ),
         col_6(
           htmlOutput(ns("exp_col_max_yr_usd_tt"), container = tags$h4),
-          highchartOutput(ns("exp_col_max_yr_usd"), height = "400px")
+          d3po_output(ns("exp_col_max_yr_usd"), height = "400px")
         ),
         col_6(
           htmlOutput(ns("exp_col_min_yr_pct_tt"), container = tags$h4),
-          highchartOutput(ns("exp_col_min_yr_pct"), height = "400px")
+          d3po_output(ns("exp_col_min_yr_pct"), height = "400px")
         ),
         col_6(
           htmlOutput(ns("exp_col_max_yr_pct_tt"), container = tags$h4),
-          highchartOutput(ns("exp_col_max_yr_pct"), height = "400px")
+          d3po_output(ns("exp_col_max_yr_pct"), height = "400px")
         ),
         col_6(
           htmlOutput(ns("exp_tt_min_yr"), container = tags$h4),
-          highchartOutput(ns("exp_tm_dtl_min_yr"), height = "500px")
+          d3po_output(ns("exp_tm_dtl_min_yr"), height = "500px")
         ),
         col_6(
           htmlOutput(ns("exp_tt_max_yr"), container = tags$h4),
-          highchartOutput(ns("exp_tm_dtl_max_yr"), height = "500px")
+          d3po_output(ns("exp_tm_dtl_max_yr"), height = "500px")
         ),
         col_12(
           htmlOutput(ns("imp_tt_yr"), container = tags$h3)
         ),
         col_6(
           htmlOutput(ns("imp_col_min_yr_usd_tt"), container = tags$h4),
-          highchartOutput(ns("imp_col_min_yr_usd"), height = "400px")
+          d3po_output(ns("imp_col_min_yr_usd"), height = "400px")
         ),
         col_6(
           htmlOutput(ns("imp_col_max_yr_usd_tt"), container = tags$h4),
-          highchartOutput(ns("imp_col_max_yr_usd"), height = "400px")
+          d3po_output(ns("imp_col_max_yr_usd"), height = "400px")
         ),
         col_6(
           htmlOutput(ns("imp_col_min_yr_pct_tt"), container = tags$h4),
-          highchartOutput(ns("imp_col_min_yr_pct"), height = "400px")
+          d3po_output(ns("imp_col_min_yr_pct"), height = "400px")
         ),
         col_6(
           htmlOutput(ns("imp_col_max_yr_pct_tt"), container = tags$h4),
-          highchartOutput(ns("imp_col_max_yr_pct"), height = "400px")
+          d3po_output(ns("imp_col_max_yr_pct"), height = "400px")
         ),
         col_6(
           htmlOutput(ns("imp_tt_min_yr"), container = tags$h4),
-          highchartOutput(ns("imp_tm_dtl_min_yr"), height = "500px")
+          d3po_output(ns("imp_tm_dtl_min_yr"), height = "500px")
         ),
         col_6(
           htmlOutput(ns("imp_tt_max_yr"), container = tags$h4),
-          highchartOutput(ns("imp_tm_dtl_max_yr"), height = "500px")
+          d3po_output(ns("imp_tm_dtl_max_yr"), height = "500px")
         ),
         col_12(
           htmlOutput(ns("dwn_stl"), container = tags$h3),
@@ -206,6 +206,10 @@ mod_products_server <- function(id) {
       input$fmt
     }) # format
 
+    tbl_agg <- "yrc"
+
+    tbl_dtl <- "yrpc"
+
     # Human-readable section name for glue templates
     section_name <- eventReactive(input$go, {
       s_code <- inp_s()
@@ -231,6 +235,14 @@ mod_products_server <- function(id) {
 
       return(s_code)
     })
+
+    # Ensure data frame contains expected columns to avoid mutate/group_by errors
+    ensure_cols <- function(df, cols) {
+      for (c in cols) {
+        if (!c %in% names(df)) df[[c]] <- NA_character_
+      }
+      df
+    }
 
     # Titles ----
 
@@ -280,7 +292,7 @@ mod_products_server <- function(id) {
 
     df_dtl <- reactive({
       # Base data from yrpc table
-      d_base <- tbl(con, "yrpc") %>%
+      d_base <- tbl(con, tbl_dtl) %>%
         filter(!!sym("year") %in% !!inp_y())
 
       # Apply section/commodity filter if specified
@@ -328,8 +340,16 @@ mod_products_server <- function(id) {
         mutate(
           !!sym("trade_value_usd_exp") := ifelse(is.na(!!sym("trade_value_usd_exp")), 0, !!sym("trade_value_usd_exp")),
           !!sym("trade_value_usd_imp") := ifelse(is.na(!!sym("trade_value_usd_imp")), 0, !!sym("trade_value_usd_imp"))
-        ) %>%
-        collect()
+        )
+
+      d <- collect(d)
+
+      # Ensure necessary columns exist to avoid downstream errors
+      d <- ensure_cols(d, c(
+        "year", "reporter_iso", "partner_iso", "commodity_code", "section_code",
+        "section_name", "section_color", "commodity_code_short", "commodity_name",
+        "trade_value_usd_exp", "trade_value_usd_imp"
+      ))
 
       if (inp_d() != "No") {
         d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
@@ -337,7 +357,7 @@ mod_products_server <- function(id) {
 
       return(d)
     }) %>%
-      bindCache(inp_y(), inp_s(), inp_d(), "yrpc") %>%
+      bindCache(inp_y(), inp_s(), inp_d(), tbl_dtl) %>%
       bindEvent(input$go)
 
     ## Trade ----
@@ -407,20 +427,9 @@ mod_products_server <- function(id) {
         trade = d$trade_value_usd_imp
       )
 
-      hchart(d,
-        "column",
-        hcaes(x = "year", y = "trade"),
-        color = "#26667f",
-        tooltip = list(
-          pointFormatter = custom_tooltip_short()
-        )
-      ) %>%
-        hc_xAxis(title = list(text = "Year")) %>%
-        hc_yAxis(
-          title = list(text = "USD billion"),
-          labels = list(formatter = JS("function() { return this.value / 1000000000 }"))
-        ) %>%
-        hc_title(text = trd_exc_columns_title())
+      d3po(d) %>%
+        po_bar(daes(x = .data$year, y = .data$trade, color = "#26667f")) %>%
+        po_labels(title = trd_exc_columns_title())
     }) %>%
       bindCache(inp_y(), inp_s(), inp_d()) %>%
       bindEvent(input$go)
@@ -454,7 +463,7 @@ mod_products_server <- function(id) {
     exp_col_min_yr_usd <- reactive({
       # Use import flow (trade_value_usd_imp) and partner_iso to identify exporters (more reliable)
       d <- df_dtl() %>%
-        filter(year == min(inp_y())) %>%
+        filter(!!sym("year") == min(inp_y())) %>%
         inner_join(
           tbl(con, "countries") %>%
             select(!!sym("country_iso"), !!sym("country_name")) %>%
@@ -476,23 +485,16 @@ mod_products_server <- function(id) {
           levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
         ))
 
-      hchart(d, "column", hcaes(x = "country_name", y = "trade_value_usd_imp"),
-        color = "#85cca6",
-        tooltip = list(pointFormatter = custom_tooltip_short())
-      ) %>%
-        hc_xAxis(title = list(text = "Country")) %>%
-        hc_yAxis(
-          title = list(text = "USD billion"),
-          labels = list(formatter = JS("function() { return this.value / 1000000000 }"))
-        ) %>%
-        hc_title(text = exp_col_min_yr_usd_tt())
+      d3po(d) %>%
+        po_bar(daes(x = .data$country_name, y = .data$trade_value_usd_imp, color = "#85cca6")) %>%
+        po_labels(title = exp_col_min_yr_usd_tt())
     }) %>%
       bindCache(inp_y(), inp_s(), inp_d()) %>%
       bindEvent(input$go)
 
     exp_col_min_yr_pct <- reactive({
       d <- df_dtl() %>%
-        filter(year == min(inp_y())) %>%
+        filter(!!sym("year") == min(inp_y())) %>%
         inner_join(
           tbl(con, "countries") %>%
             select(!!sym("country_iso"), !!sym("country_name")) %>%
@@ -515,20 +517,16 @@ mod_products_server <- function(id) {
           levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
         ))
 
-      hchart(d, "column", hcaes(x = "country_name", y = "percentage"),
-        color = "#85cca6",
-        tooltip = list(pointFormatter = JS("function() { return this.point.name + ': <b>' + this.y + '%</b>'; }"))
-      ) %>%
-        hc_xAxis(title = list(text = "Country")) %>%
-        hc_yAxis(title = list(text = "Percentage (%)")) %>%
-        hc_title(text = exp_col_min_yr_pct_tt())
+      d3po(d) %>%
+        po_bar(daes(x = .data$country_name, y = .data$percentage, color = "#85cca6")) %>%
+        po_labels(title = exp_col_min_yr_pct_tt())
     }) %>%
       bindCache(inp_y(), inp_s(), inp_d()) %>%
       bindEvent(input$go)
 
     exp_col_max_yr_usd <- reactive({
       d <- df_dtl() %>%
-        filter(year == max(inp_y())) %>%
+        filter(!!sym("year") == max(inp_y())) %>%
         inner_join(
           tbl(con, "countries") %>%
             select(!!sym("country_iso"), !!sym("country_name")) %>%
@@ -550,23 +548,16 @@ mod_products_server <- function(id) {
           levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
         ))
 
-      hchart(d, "column", hcaes(x = "country_name", y = "trade_value_usd_imp"),
-        color = "#67c090",
-        tooltip = list(pointFormatter = custom_tooltip_short())
-      ) %>%
-        hc_xAxis(title = list(text = "Country")) %>%
-        hc_yAxis(
-          title = list(text = "USD billion"),
-          labels = list(formatter = JS("function() { return this.value / 1000000000 }"))
-        ) %>%
-        hc_title(text = exp_col_max_yr_usd_tt())
+      d3po(d) %>%
+        po_bar(daes(x = .data$country_name, y = .data$trade_value_usd_imp, color = "#67c090")) %>%
+        po_labels(title = exp_col_max_yr_usd_tt())
     }) %>%
       bindCache(inp_y(), inp_s(), inp_d()) %>%
       bindEvent(input$go)
 
     exp_col_max_yr_pct <- reactive({
       d <- df_dtl() %>%
-        filter(year == max(inp_y())) %>%
+        filter(!!sym("year") == max(inp_y())) %>%
         inner_join(
           tbl(con, "countries") %>%
             select(!!sym("country_iso"), !!sym("country_name")) %>%
@@ -589,13 +580,9 @@ mod_products_server <- function(id) {
           levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
         ))
 
-      hchart(d, "column", hcaes(x = "country_name", y = "percentage"),
-        color = "#67c090",
-        tooltip = list(pointFormatter = JS("function() { return this.point.name + ': <b>' + this.y + '%</b>'; }"))
-      ) %>%
-        hc_xAxis(title = list(text = "Country")) %>%
-        hc_yAxis(title = list(text = "Percentage (%)")) %>%
-        hc_title(text = exp_col_max_yr_pct_tt())
+      d3po(d) %>%
+        po_bar(daes(x = .data$country_name, y = .data$percentage, color = "#67c090")) %>%
+        po_labels(title = exp_col_max_yr_pct_tt())
     }) %>%
       bindCache(inp_y(), inp_s(), inp_d()) %>%
       bindEvent(input$go)
@@ -625,7 +612,7 @@ mod_products_server <- function(id) {
         distinct() %>%
         arrange(!!sym("continent_name"))
 
-      od_to_highcharts(d, d2)
+      od_treemap(d, d2)
     }) %>%
       bindCache(inp_y(), inp_s(), inp_d()) %>%
       bindEvent(input$go)
@@ -655,7 +642,7 @@ mod_products_server <- function(id) {
         distinct() %>%
         arrange(!!sym("continent_name"))
 
-      od_to_highcharts(d, d2)
+      od_treemap(d, d2)
     }) %>%
       bindCache(inp_y(), inp_s(), inp_d()) %>%
       bindEvent(input$go)
@@ -689,7 +676,7 @@ mod_products_server <- function(id) {
     imp_col_min_yr_usd <- reactive({
       # Use import flow (trade_value_usd_imp) and reporter_iso to identify importers (more reliable)
       d <- df_dtl() %>%
-        filter(year == min(inp_y())) %>%
+        filter(!!sym("year") == min(inp_y())) %>%
         inner_join(
           tbl(con, "countries") %>%
             select(!!sym("country_iso"), !!sym("country_name")) %>%
@@ -711,23 +698,16 @@ mod_products_server <- function(id) {
           levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
         ))
 
-      hchart(d, "column", hcaes(x = "country_name", y = "trade_value_usd_imp"),
-        color = "#518498",
-        tooltip = list(pointFormatter = custom_tooltip_short())
-      ) %>%
-        hc_xAxis(title = list(text = "Country")) %>%
-        hc_yAxis(
-          title = list(text = "USD billion"),
-          labels = list(formatter = JS("function() { return this.value / 1000000000 }"))
-        ) %>%
-        hc_title(text = imp_col_min_yr_usd_tt())
+      d3po(d) %>%
+        po_bar(daes(x = .data$country_name, y = .data$trade_value_usd_imp, color = "#518498")) %>%
+        po_labels(title = imp_col_min_yr_usd_tt())
     }) %>%
       bindCache(inp_y(), inp_s(), inp_d()) %>%
       bindEvent(input$go)
 
     imp_col_min_yr_pct <- reactive({
       d <- df_dtl() %>%
-        filter(year == min(inp_y())) %>%
+        filter(!!sym("year") == min(inp_y())) %>%
         inner_join(
           tbl(con, "countries") %>%
             select(!!sym("country_iso"), !!sym("country_name")) %>%
@@ -750,20 +730,16 @@ mod_products_server <- function(id) {
           levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
         ))
 
-      hchart(d, "column", hcaes(x = "country_name", y = "percentage"),
-        color = "#518498",
-        tooltip = list(pointFormatter = JS("function() { return this.point.name + ': <b>' + this.y + '%</b>'; }"))
-      ) %>%
-        hc_xAxis(title = list(text = "Country")) %>%
-        hc_yAxis(title = list(text = "Percentage (%)")) %>%
-        hc_title(text = imp_col_min_yr_pct_tt())
+      d3po(d) %>%
+        po_bar(daes(x = .data$country_name, y = .data$percentage, color = "#518498")) %>%
+        po_labels(title = imp_col_min_yr_pct_tt())
     }) %>%
       bindCache(inp_y(), inp_s(), inp_d()) %>%
       bindEvent(input$go)
 
     imp_col_max_yr_usd <- reactive({
       d <- df_dtl() %>%
-        filter(year == max(inp_y())) %>%
+        filter(!!sym("year") == max(inp_y())) %>%
         inner_join(
           tbl(con, "countries") %>%
             select(!!sym("country_iso"), !!sym("country_name")) %>%
@@ -785,23 +761,16 @@ mod_products_server <- function(id) {
           levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
         ))
 
-      hchart(d, "column", hcaes(x = "country_name", y = "trade_value_usd_imp"),
-        color = "#26667f",
-        tooltip = list(pointFormatter = custom_tooltip_short())
-      ) %>%
-        hc_xAxis(title = list(text = "Country")) %>%
-        hc_yAxis(
-          title = list(text = "USD billion"),
-          labels = list(formatter = JS("function() { return this.value / 1000000000 }"))
-        ) %>%
-        hc_title(text = imp_col_max_yr_usd_tt())
+      d3po(d) %>%
+        po_bar(daes(x = .data$country_name, y = .data$trade_value_usd_imp, color = "#26667f")) %>%
+        po_labels(title = imp_col_max_yr_usd_tt())
     }) %>%
       bindCache(inp_y(), inp_s(), inp_d()) %>%
       bindEvent(input$go)
 
     imp_col_max_yr_pct <- reactive({
       d <- df_dtl() %>%
-        filter(year == max(inp_y())) %>%
+        filter(!!sym("year") == max(inp_y())) %>%
         inner_join(
           tbl(con, "countries") %>%
             select(!!sym("country_iso"), !!sym("country_name")) %>%
@@ -824,13 +793,9 @@ mod_products_server <- function(id) {
           levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
         ))
 
-      hchart(d, "column", hcaes(x = "country_name", y = "percentage"),
-        color = "#26667f",
-        tooltip = list(pointFormatter = JS("function() { return this.point.name + ': <b>' + this.y + '%</b>'; }"))
-      ) %>%
-        hc_xAxis(title = list(text = "Country")) %>%
-        hc_yAxis(title = list(text = "Percentage (%)")) %>%
-        hc_title(text = imp_col_max_yr_pct_tt())
+      d3po(d) %>%
+        po_bar(daes(x = .data$country_name, y = .data$percentage, color = "#26667f")) %>%
+        po_labels(title = imp_col_max_yr_pct_tt())
     }) %>%
       bindCache(inp_y(), inp_s(), inp_d()) %>%
       bindEvent(input$go)
@@ -860,7 +825,7 @@ mod_products_server <- function(id) {
         distinct() %>%
         arrange(!!sym("continent_name"))
 
-      od_to_highcharts(d, d2)
+      od_treemap(d, d2)
     }) %>%
       bindCache(inp_y(), inp_s(), inp_d()) %>%
       bindEvent(input$go)
@@ -890,7 +855,7 @@ mod_products_server <- function(id) {
         distinct() %>%
         arrange(!!sym("continent_name"))
 
-      out <- od_to_highcharts(d, d2)
+      out <- od_treemap(d, d2)
 
       w$hide()
       return(out)
@@ -933,7 +898,7 @@ mod_products_server <- function(id) {
 
     output$trd_smr_trade <- renderText(trd_smr_txt())
 
-    output$trd_exc_columns_agg <- renderHighchart({
+    output$trd_exc_columns_agg <- render_d3po({
       trd_exc_columns_agg()
     })
 
@@ -942,28 +907,28 @@ mod_products_server <- function(id) {
     output$exp_tt_yr <- renderText(exp_tt_yr())
 
     output$exp_col_min_yr_usd_tt <- renderText(exp_col_min_yr_usd_tt())
-    output$exp_col_min_yr_usd <- renderHighchart({
+    output$exp_col_min_yr_usd <- render_d3po({
       exp_col_min_yr_usd()
     })
     output$exp_col_min_yr_pct_tt <- renderText(exp_col_min_yr_pct_tt())
-    output$exp_col_min_yr_pct <- renderHighchart({
+    output$exp_col_min_yr_pct <- render_d3po({
       exp_col_min_yr_pct()
     })
     output$exp_col_max_yr_usd_tt <- renderText(exp_col_max_yr_usd_tt())
-    output$exp_col_max_yr_usd <- renderHighchart({
+    output$exp_col_max_yr_usd <- render_d3po({
       exp_col_max_yr_usd()
     })
     output$exp_col_max_yr_pct_tt <- renderText(exp_col_max_yr_pct_tt())
-    output$exp_col_max_yr_pct <- renderHighchart({
+    output$exp_col_max_yr_pct <- render_d3po({
       exp_col_max_yr_pct()
     })
 
     output$exp_tt_min_yr <- renderText(exp_tt_min_yr())
-    output$exp_tm_dtl_min_yr <- renderHighchart({
+    output$exp_tm_dtl_min_yr <- render_d3po({
       exp_tm_dtl_min_yr()
     })
     output$exp_tt_max_yr <- renderText(exp_tt_max_yr())
-    output$exp_tm_dtl_max_yr <- renderHighchart({
+    output$exp_tm_dtl_max_yr <- render_d3po({
       exp_tm_dtl_max_yr()
     })
 
@@ -972,28 +937,28 @@ mod_products_server <- function(id) {
     output$imp_tt_yr <- renderText(imp_tt_yr())
 
     output$imp_col_min_yr_usd_tt <- renderText(imp_col_min_yr_usd_tt())
-    output$imp_col_min_yr_usd <- renderHighchart({
+    output$imp_col_min_yr_usd <- render_d3po({
       imp_col_min_yr_usd()
     })
     output$imp_col_min_yr_pct_tt <- renderText(imp_col_min_yr_pct_tt())
-    output$imp_col_min_yr_pct <- renderHighchart({
+    output$imp_col_min_yr_pct <- render_d3po({
       imp_col_min_yr_pct()
     })
     output$imp_col_max_yr_usd_tt <- renderText(imp_col_max_yr_usd_tt())
-    output$imp_col_max_yr_usd <- renderHighchart({
+    output$imp_col_max_yr_usd <- render_d3po({
       imp_col_max_yr_usd()
     })
     output$imp_col_max_yr_pct_tt <- renderText(imp_col_max_yr_pct_tt())
-    output$imp_col_max_yr_pct <- renderHighchart({
+    output$imp_col_max_yr_pct <- render_d3po({
       imp_col_max_yr_pct()
     })
 
     output$imp_tt_min_yr <- renderText(imp_tt_min_yr())
-    output$imp_tm_dtl_min_yr <- renderHighchart({
+    output$imp_tm_dtl_min_yr <- render_d3po({
       imp_tm_dtl_min_yr()
     })
     output$imp_tt_max_yr <- renderText(imp_tt_max_yr())
-    output$imp_tm_dtl_max_yr <- renderHighchart({
+    output$imp_tm_dtl_max_yr <- render_d3po({
       imp_tm_dtl_max_yr()
     })
 
