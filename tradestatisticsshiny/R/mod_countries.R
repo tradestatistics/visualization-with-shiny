@@ -1234,7 +1234,10 @@ mod_countries_server <- function(id) {
 
         d <- d %>%
           group_by(!!sym("country_name")) %>%
-          summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
+          summarise(
+            trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE),
+            .groups = "drop"
+          ) %>%
           filter(!!sym("trade_value_usd_exp") > 0) %>%
           mutate(country_name = fct_lump_n(
             f = !!sym("country_name"),
@@ -1243,81 +1246,119 @@ mod_countries_server <- function(id) {
             other_level = "Rest of the world"
           )) %>%
           group_by(!!sym("country_name")) %>%
-          summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
-          mutate(
-            country_name = factor(!!sym("country_name"),
-              levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
-            ),
-            color = "#91d1ae"
-          )
+          summarise(
+            trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE),
+            .groups = "drop"
+          ) %>%
+          mutate(color = "#518498")
 
-        # convert to USD billions and round to 2 decimals for plotting
         d <- d %>%
-          mutate(trade = round(.data$trade_value_usd_exp / 1e9, 2))
+          filter(!!sym("country_name") == "Rest of the world") %>%
+          mutate(n = 5L) %>%
+          bind_rows(
+            d %>%
+              filter(!!sym("country_name") != "Rest of the world") %>%
+              arrange(desc(!!sym("trade_value_usd_exp"))) %>%
+              mutate(n = row_number())
+          ) %>%
+          mutate(
+            country_name = paste(n, !!sym("country_name"), sep = " - "),
+            trade_value_usd_exp = round(!!sym("trade_value_usd_exp") / 1e9, 2)
+          ) %>%
+          select(-n)
 
         d3po(d) %>%
           po_bar(
             daes(
               y = .data$country_name,
-              x = .data$trade,
-              color = .data$color
+              x = .data$trade_value_usd_exp,
+              color = .data$color,
+              sort = "asc-y"
             )
           ) %>%
-          po_labels(title = exp_col_min_yr_usd_tt(), y = "Country", x = "Trade Value (USD Billion)") %>%
-          po_format(x = format(.data$trade, big.mark = " ", scientific = FALSE)) %>%
-          po_tooltip("{country_name}: {trade} B") %>%
+          po_labels(
+            title = exp_col_min_yr_usd_tt(),
+            y = "Country",
+            x = "Trade Value (USD Billion)"
+          ) %>%
+          po_format(x = format(.data$trade_value_usd_exp, big.mark = " ", scientific = FALSE)) %>%
+          po_tooltip("{country_name}: {trade_value_usd_exp} B") %>%
           po_background("transparent")
       } else {
-        # Show top 4 sections + "Other products" for bilateral trade
+        # Show top 4 partners + "Rest of the world" for multilateral trade
         d <- d %>%
           filter(
             !!sym("year") == !!min_year &
-              !!sym("reporter_iso") == !!inp_r() &
-              !!sym("partner_iso") == !!inp_p()
+              !!sym("reporter_iso") == !!inp_r()
           )
+
+        d <- d %>% collect()
 
         d <- d %>%
           inner_join(
-            tbl(con, "commodities") %>%
-              distinct(!!sym("commodity_code"), !!sym("section_code"), !!sym("section_name"), !!sym("section_color")),
-            by = c("commodity_code", "section_code")
-          ) %>%
-          collect()
+            tbl(con, "countries") %>%
+              select(!!sym("country_iso"), !!sym("country_name")) %>%
+              collect(),
+            by = c("partner_iso" = "country_iso")
+          )
 
         if (inp_d() != "No") {
           d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
         }
 
         d <- d %>%
-          group_by(!!sym("section_name")) %>%
-          summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
+          group_by(!!sym("country_name")) %>%
+          summarise(
+            trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE),
+            .groups = "drop"
+          ) %>%
           filter(!!sym("trade_value_usd_exp") > 0) %>%
-          mutate(section_name = fct_lump_n(
-            f = !!sym("section_name"),
+          mutate(country_name = fct_lump_n(
+            f = !!sym("country_name"),
             n = 4,
             w = !!sym("trade_value_usd_exp"),
-            other_level = "Other products"
+            other_level = "Rest of the world"
           )) %>%
-          group_by(!!sym("section_name")) %>%
-          summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
-          mutate(section_name = factor(!!sym("section_name"),
-            levels = c(setdiff(unique(!!sym("section_name")), "Other products"), "Other products")
-          ))
+          group_by(!!sym("country_name")) %>%
+          summarise(
+            trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE),
+            .groups = "drop"
+          ) %>%
+          mutate(color = "#518498")
 
-        d <- d %>% mutate(trade = round(.data$trade_value_usd_exp / 1e9, 2))
+        d <- d %>%
+          filter(!!sym("country_name") == "Rest of the world") %>%
+          mutate(n = 5L) %>%
+          bind_rows(
+            d %>%
+              filter(!!sym("country_name") != "Rest of the world") %>%
+              arrange(desc(!!sym("trade_value_usd_exp"))) %>%
+              mutate(n = row_number())
+          ) %>%
+          mutate(
+            country_name = paste(n, !!sym("country_name"), sep = " - "),
+            trade_value_usd_exp = round(!!sym("trade_value_usd_exp") / 1e9, 2)
+          ) %>%
+          select(-n)
 
         d3po(d) %>%
           po_bar(
             daes(
-              y = .data$section_name,
-              x = .data$trade,
-              color = "#91d1ae"
+              y = .data$country_name,
+              x = .data$trade_value_usd_exp,
+              color = .data$color,
+              sort = "asc-y"
             )
           ) %>%
-          po_labels(title = exp_col_min_yr_usd_tt(), x = NULL, y = "Trade Value (USD Billion)") %>%
-          po_format(y = format(.data$trade, big.mark = " ", scientific = FALSE)) %>%
-          po_tooltip("{section_name}: {trade} B") %>%
+          po_labels(
+            title = exp_col_min_yr_usd_tt(),
+            y = "Country",
+            x = "Trade Value (USD Billion)"
+          ) %>%
+          po_format(x = format(.data$trade_value_usd_exp, big.mark = " ", scientific = FALSE)) %>%
+          po_tooltip("{country_name}: {trade_value_usd_exp} B") %>%
           po_background("transparent")
+        
       }
     }) %>%
       bindCache(inp_y(), inp_r(), inp_p(), inp_d()) %>%
@@ -1351,7 +1392,10 @@ mod_countries_server <- function(id) {
 
         d <- d %>%
           group_by(!!sym("country_name")) %>%
-          summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
+          summarise(
+            trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE),
+            .groups = "drop"
+          ) %>%
           filter(!!sym("trade_value_usd_exp") > 0) %>%
           mutate(country_name = fct_lump_n(
             f = !!sym("country_name"),
@@ -1360,80 +1404,108 @@ mod_countries_server <- function(id) {
             other_level = "Rest of the world"
           )) %>%
           group_by(!!sym("country_name")) %>%
-          summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
-          mutate(
-            country_name = factor(!!sym("country_name"),
-              levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
-            ),
-            color = "#67c090"
-          )
-
-        d <- d %>% mutate(trade = round(.data$trade_value_usd_exp / 1e9, 2))
-
-        d3po(d) %>%
-          po_bar(
-            daes(
-              y = .data$country_name,
-              x = .data$trade,
-              color = .data$color
-            )
+          summarise(
+            trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE),
+            .groups = "drop"
           ) %>%
-          po_labels(title = exp_col_min_yr_usd_tt(), y = "Country", x = "Trade Value (USD Billion)") %>%
-          po_format(x = format(.data$trade, big.mark = " ", scientific = FALSE)) %>%
-          po_tooltip("{country_name}: {trade} B") %>%
-          po_background("transparent")
+          mutate(color = "#26667f")
+
+        d <- d %>%
+          filter(!!sym("country_name") == "Rest of the world") %>%
+          mutate(n = 5L) %>%
+          bind_rows(
+            d %>%
+              filter(!!sym("country_name") != "Rest of the world") %>%
+              arrange(desc(!!sym("trade_value_usd_exp"))) %>%
+              mutate(n = row_number())
+          ) %>%
+          mutate(
+            country_name = paste(n, !!sym("country_name"), sep = " - "),
+            trade_value_usd_exp = round(!!sym("trade_value_usd_exp") / 1e9, 2),
+            color = "#26667f"
+          ) %>%
+          select(-n)
       } else {
-        # Show top 4 sections + "Other products" for bilateral trade
+        # Show top 4 destinations + selected partner + "Rest of the world" for bilateral trade
         d <- d %>%
           filter(
             !!sym("year") == !!max_year &
-              !!sym("reporter_iso") == !!inp_r() &
-              !!sym("partner_iso") == !!inp_p()
+            !!sym("reporter_iso") == !!inp_r()
           )
+
+        d <- d %>% collect()
 
         d <- d %>%
           inner_join(
-            tbl(con, "commodities") %>%
-              distinct(!!sym("commodity_code"), !!sym("section_code"), !!sym("section_name"), !!sym("section_color")),
-            by = c("commodity_code", "section_code")
-          ) %>%
-          collect()
+            tbl(con, "countries") %>%
+              select(!!sym("country_iso"), !!sym("country_name")) %>%
+              collect(),
+            by = c("partner_iso" = "country_iso")
+          )
 
         if (inp_d() != "No") {
           d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
         }
 
         d <- d %>%
-          group_by(!!sym("section_name")) %>%
-          summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
+          group_by(!!sym("country_name")) %>%
+          summarise(
+            trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE),
+            .groups = "drop"
+          ) %>%
           filter(!!sym("trade_value_usd_exp") > 0) %>%
-          mutate(section_name = fct_lump_n(
-            f = !!sym("section_name"),
-            n = 4,
-            w = !!sym("trade_value_usd_exp"),
-            other_level = "Other products"
-          )) %>%
-          group_by(!!sym("section_name")) %>%
-          summarise(trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE), .groups = "drop") %>%
-          mutate(section_name = factor(!!sym("section_name"),
-            levels = c(setdiff(unique(!!sym("section_name")), "Other products"), "Other products")
-          ))
+          arrange(
+            desc(!!sym("trade_value_usd_exp"))
+          ) %>%
+          mutate(
+            n = row_number(),
+            country_name = case_when(
+              n <= 4L ~ !!sym("country_name"),
+              !!sym("country_name") == !!pname() ~ !!sym("country_name"),
+              TRUE ~ "Rest of the world"
+            )
+          ) %>%
+          group_by(!!sym("country_name")) %>%
+          summarise(
+            trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE),
+            .groups = "drop"
+          ) %>%
+          mutate(
+            color = case_when(
+              !!sym("country_name") == !!pname() ~ "#d04e66",
+              TRUE ~ "#26667f"
+            )
+          )
 
-        d <- d %>% mutate(trade = round(.data$trade_value_usd_exp / 1e9, 2))
+        d <- d %>%
+          filter(!!sym("country_name") == "Rest of the world") %>%
+          mutate(n = 5L) %>%
+          bind_rows(
+            d %>%
+              filter(!!sym("country_name") != "Rest of the world") %>%
+              arrange(desc(!!sym("trade_value_usd_exp"))) %>%
+              mutate(n = row_number())
+          ) %>%
+          mutate(
+            country_name = paste(n, !!sym("country_name"), sep = " - "),
+            trade_value_usd_exp = round(!!sym("trade_value_usd_exp") / 1e9, 2)
+          ) %>%
+          select(-n)
+      }
 
-        d3po(d) %>%
+      d3po(d) %>%
           po_bar(
             daes(
-              y = .data$section_name,
-              x = .data$trade,
-              color = "#67c090"
+              y = .data$country_name,
+              x = .data$trade_value_usd_exp,
+              color = .data$color,
+              sort = "asc-y"
             )
           ) %>%
           po_labels(title = exp_col_max_yr_usd_tt(), x = NULL, y = "Trade Value (USD Billion)") %>%
-          po_format(y = format(.data$trade, big.mark = " ", scientific = FALSE)) %>%
-          po_tooltip("{section_name}: {trade} B") %>%
+          po_format(x = format(.data$trade_value_usd_exp, big.mark = " ", scientific = FALSE)) %>%
+          po_tooltip("{country_name}: {trade_value_usd_exp} B") %>%
           po_background("transparent")
-      }
     }) %>%
       bindCache(inp_y(), inp_r(), inp_p(), inp_d()) %>%
       bindEvent(input$go)
@@ -1578,7 +1650,10 @@ mod_countries_server <- function(id) {
 
         d <- d %>%
           group_by(!!sym("country_name")) %>%
-          summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+          summarise(
+            trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
+            .groups = "drop"
+          ) %>%
           filter(!!sym("trade_value_usd_imp") > 0) %>%
           mutate(country_name = fct_lump_n(
             f = !!sym("country_name"),
@@ -1587,27 +1662,43 @@ mod_countries_server <- function(id) {
             other_level = "Rest of the world"
           )) %>%
           group_by(!!sym("country_name")) %>%
-          summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
-          mutate(
-            country_name = factor(!!sym("country_name"),
-              levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
-            ),
-            color = "#518498"
-          )
+          summarise(
+            trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
+            .groups = "drop"
+          ) %>%
+          mutate(color = "#85cca6")
 
-        d <- d %>% mutate(trade = round(.data$trade_value_usd_imp / 1e9, 2))
+        d <- d %>%
+          filter(!!sym("country_name") == "Rest of the world") %>%
+          mutate(n = 5L) %>%
+          bind_rows(
+            d %>%
+              filter(!!sym("country_name") != "Rest of the world") %>%
+              arrange(desc(!!sym("trade_value_usd_imp"))) %>%
+              mutate(n = row_number())
+          ) %>%
+          mutate(
+            country_name = paste(n, !!sym("country_name"), sep = " - "),
+            trade_value_usd_imp = round(!!sym("trade_value_usd_imp") / 1e9, 2)
+          ) %>%
+          select(-n)
 
         d3po(d) %>%
           po_bar(
             daes(
               y = .data$country_name,
-              x = .data$trade,
-              color = .data$color
+              x = .data$trade_value_usd_imp,
+              color = .data$color,
+              sort = "asc-y"
             )
           ) %>%
-          po_labels(title = imp_col_min_yr_usd_tt(), y = "Country", x = "Trade Value (USD Billion)") %>%
-          po_format(x = format(.data$trade, big.mark = " ", scientific = FALSE)) %>%
-          po_tooltip("{country_name}: {trade} B") %>%
+          po_labels(
+            title = imp_col_min_yr_usd_tt(),
+            y = "Country",
+            x = "Trade Value (USD Billion)"
+          ) %>%
+          po_format(x = format(.data$trade_value_usd_imp, big.mark = " ", scientific = FALSE)) %>%
+          po_tooltip("{country_name}: {trade_value_usd_imp} B") %>%
           po_background("transparent")
       } else {
         # Show top 4 sections + "Other products" for bilateral trade
@@ -1632,7 +1723,10 @@ mod_countries_server <- function(id) {
 
         d <- d %>%
           group_by(!!sym("section_name")) %>%
-          summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+          summarise(
+            trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
+            .groups = "drop"
+          ) %>%
           filter(!!sym("trade_value_usd_imp") > 0) %>%
           mutate(section_name = fct_lump_n(
             f = !!sym("section_name"),
@@ -1641,23 +1735,26 @@ mod_countries_server <- function(id) {
             other_level = "Other products"
           )) %>%
           group_by(!!sym("section_name")) %>%
-          summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
-          mutate(section_name = factor(!!sym("section_name"),
-            levels = c(setdiff(unique(!!sym("section_name")), "Other products"), "Other products")
-          ))
-
-        d <- d %>% mutate(trade = round(.data$trade_value_usd_imp / 1e9, 2))
+          summarise(
+            trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
+            .groups = "drop"
+          ) %>%
+          mutate(
+            section_name = factor(!!sym("section_name"),
+              levels = c(setdiff(unique(!!sym("section_name")), "Other products"), "Other products")),
+            trade_value_usd_imp = round(!!sym("trade_value_usd_imp") / 1e9, 2)
+          )
 
         d3po(d) %>%
           po_bar(
             daes(
               y = .data$section_name,
-              x = .data$trade,
-              color = "#518498"
+              x = .data$trade_value_usd_imp,
+              color = "#91d1ae"
             )
           ) %>%
           po_labels(title = imp_col_min_yr_usd_tt(), x = NULL, y = "Trade Value (USD Billion)") %>%
-          po_format(y = format(.data$trade, big.mark = " ", scientific = FALSE)) %>%
+          po_format(y = format(.data$trade_value_usd_imp, big.mark = " ", scientific = FALSE)) %>%
           po_tooltip("{section_name}: {trade} B") %>%
           po_background("transparent")
       }
@@ -1693,7 +1790,10 @@ mod_countries_server <- function(id) {
 
         d <- d %>%
           group_by(!!sym("country_name")) %>%
-          summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+          summarise(
+            trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
+            .groups = "drop"
+          ) %>%
           filter(!!sym("trade_value_usd_imp") > 0) %>%
           mutate(country_name = fct_lump_n(
             f = !!sym("country_name"),
@@ -1702,27 +1802,43 @@ mod_countries_server <- function(id) {
             other_level = "Rest of the world"
           )) %>%
           group_by(!!sym("country_name")) %>%
-          summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
-          mutate(
-            country_name = factor(!!sym("country_name"),
-              levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
-            ),
-            color = "#26667f"
-          )
+          summarise(
+            trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
+            .groups = "drop"
+          ) %>%
+          mutate(color = "#67c090")
 
-        d <- d %>% mutate(trade = round(.data$trade_value_usd_imp / 1e9, 2))
+        d <- d %>%
+          filter(!!sym("country_name") == "Rest of the world") %>%
+          mutate(n = 5L) %>%
+          bind_rows(
+            d %>%
+              filter(!!sym("country_name") != "Rest of the world") %>%
+              arrange(desc(!!sym("trade_value_usd_imp"))) %>%
+              mutate(n = row_number())
+          ) %>%
+          mutate(
+            country_name = paste(n, !!sym("country_name"), sep = " - "),
+            trade_value_usd_imp = round(!!sym("trade_value_usd_imp") / 1e9, 2)
+          ) %>%
+          select(-n)
 
         d3po(d) %>%
           po_bar(
             daes(
               y = .data$country_name,
-              x = .data$trade,
-              color = .data$color
+              x = .data$trade_value_usd_imp,
+              color = .data$color,
+              sort = "asc-y"
             )
           ) %>%
-          po_labels(title = imp_col_max_yr_usd_tt(), y = "Country", x = "Trade Value (USD Billion)") %>%
-          po_format(x = format(.data$trade, big.mark = " ", scientific = FALSE)) %>%
-          po_tooltip("{country_name}: {trade} B") %>%
+          po_labels(
+            title = imp_col_max_yr_usd_tt(),
+            y = "Country",
+            x = "Trade Value (USD Billion)"
+          ) %>%
+          po_format(x = format(.data$trade_value_usd_imp, big.mark = " ", scientific = FALSE)) %>%
+          po_tooltip("{country_name}: {trade_value_usd_imp} B") %>%
           po_background("transparent")
       } else {
         # Show top 4 sections + "Other products" for bilateral trade
@@ -1747,7 +1863,10 @@ mod_countries_server <- function(id) {
 
         d <- d %>%
           group_by(!!sym("section_name")) %>%
-          summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+          summarise(
+            trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
+            .groups = "drop"
+          ) %>%
           filter(!!sym("trade_value_usd_imp") > 0) %>%
           mutate(section_name = fct_lump_n(
             f = !!sym("section_name"),
@@ -1759,23 +1878,20 @@ mod_countries_server <- function(id) {
           summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
           mutate(
             section_name = factor(!!sym("section_name"),
-              levels = c(setdiff(unique(!!sym("section_name")), "Other products"), "Other products")
-            ),
-            color = "#26667f"
+              levels = c(setdiff(unique(!!sym("section_name")), "Other products"), "Other products")),
+              trade_value_usd_imp = round(!!sym("trade_value_usd_imp") / 1e9, 2)
           )
-
-        d <- d %>% mutate(trade = round(.data$trade_value_usd_imp / 1e9, 2))
 
         d3po(d) %>%
           po_bar(
             daes(
               y = .data$section_name,
-              x = .data$trade,
-              color = .data$color
+              x = .data$trade_value_usd_imp,
+              color = "#91d1ae"
             )
           ) %>%
           po_labels(title = imp_col_max_yr_usd_tt(), x = NULL, y = "Trade Value (USD Billion)") %>%
-          po_format(y = format(.data$trade, big.mark = " ", scientific = FALSE)) %>%
+          po_format(y = format(.data$trade_value_usd_imp, big.mark = " ", scientific = FALSE)) %>%
           po_tooltip("{section_name}: {trade} B") %>%
           po_background("transparent")
       }
