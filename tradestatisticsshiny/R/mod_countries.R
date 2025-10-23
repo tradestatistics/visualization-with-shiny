@@ -1250,7 +1250,7 @@ mod_countries_server <- function(id) {
             trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE),
             .groups = "drop"
           ) %>%
-          mutate(color = "#518498")
+          mutate(color = "#67c090")
 
         d <- d %>%
           filter(!!sym("country_name") == "Rest of the world") %>%
@@ -1263,29 +1263,12 @@ mod_countries_server <- function(id) {
           ) %>%
           mutate(
             country_name = paste(n, !!sym("country_name"), sep = " - "),
-            trade_value_usd_exp = round(!!sym("trade_value_usd_exp") / 1e9, 2)
+            trade_value_usd_exp = round(!!sym("trade_value_usd_exp") / 1e9, 2),
+            color = "#67c090"
           ) %>%
           select(-n)
-
-        d3po(d) %>%
-          po_bar(
-            daes(
-              y = .data$country_name,
-              x = .data$trade_value_usd_exp,
-              color = .data$color,
-              sort = "asc-y"
-            )
-          ) %>%
-          po_labels(
-            title = exp_col_min_yr_usd_tt(),
-            y = "Country",
-            x = "Trade Value (USD Billion)"
-          ) %>%
-          po_format(x = format(.data$trade_value_usd_exp, big.mark = " ", scientific = FALSE)) %>%
-          po_tooltip("{country_name}: {trade_value_usd_exp} B") %>%
-          po_background("transparent")
       } else {
-        # Show top 4 partners + "Rest of the world" for multilateral trade
+        # Show top 4 destinations + selected partner + "Rest of the world" for bilateral trade
         d <- d %>%
           filter(
             !!sym("year") == !!min_year &
@@ -1313,18 +1296,28 @@ mod_countries_server <- function(id) {
             .groups = "drop"
           ) %>%
           filter(!!sym("trade_value_usd_exp") > 0) %>%
-          mutate(country_name = fct_lump_n(
-            f = !!sym("country_name"),
-            n = 4,
-            w = !!sym("trade_value_usd_exp"),
-            other_level = "Rest of the world"
-          )) %>%
+          arrange(
+            desc(!!sym("trade_value_usd_exp"))
+          ) %>%
+          mutate(
+            n = row_number(),
+            country_name = case_when(
+              n <= 4L ~ !!sym("country_name"),
+              !!sym("country_name") == !!pname() ~ !!sym("country_name"),
+              TRUE ~ "Rest of the world"
+            )
+          ) %>%
           group_by(!!sym("country_name")) %>%
           summarise(
             trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE),
             .groups = "drop"
           ) %>%
-          mutate(color = "#518498")
+          mutate(
+            color = case_when(
+              !!sym("country_name") == !!pname() ~ "#d04e66",
+              TRUE ~ "#67c090"
+            )
+          )
 
         d <- d %>%
           filter(!!sym("country_name") == "Rest of the world") %>%
@@ -1340,26 +1333,21 @@ mod_countries_server <- function(id) {
             trade_value_usd_exp = round(!!sym("trade_value_usd_exp") / 1e9, 2)
           ) %>%
           select(-n)
-
-        d3po(d) %>%
-          po_bar(
-            daes(
-              y = .data$country_name,
-              x = .data$trade_value_usd_exp,
-              color = .data$color,
-              sort = "asc-y"
-            )
-          ) %>%
-          po_labels(
-            title = exp_col_min_yr_usd_tt(),
-            y = "Country",
-            x = "Trade Value (USD Billion)"
-          ) %>%
-          po_format(x = format(.data$trade_value_usd_exp, big.mark = " ", scientific = FALSE)) %>%
-          po_tooltip("{country_name}: {trade_value_usd_exp} B") %>%
-          po_background("transparent")
-        
       }
+
+      d3po(d) %>%
+        po_bar(
+          daes(
+            y = .data$country_name,
+            x = .data$trade_value_usd_exp,
+            color = .data$color,
+            sort = "asc-y"
+          )
+        ) %>%
+        po_labels(title = exp_col_min_yr_usd_tt(), x = NULL, y = "Trade Value (USD Billion)") %>%
+        po_format(x = format(.data$trade_value_usd_exp, big.mark = " ", scientific = FALSE)) %>%
+        po_tooltip("{country_name}: {trade_value_usd_exp} B") %>%
+        po_background("transparent")
     }) %>%
       bindCache(inp_y(), inp_r(), inp_p(), inp_d()) %>%
       bindEvent(input$go)
@@ -1408,7 +1396,7 @@ mod_countries_server <- function(id) {
             trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE),
             .groups = "drop"
           ) %>%
-          mutate(color = "#26667f")
+          mutate(color = "#67c090")
 
         d <- d %>%
           filter(!!sym("country_name") == "Rest of the world") %>%
@@ -1422,7 +1410,7 @@ mod_countries_server <- function(id) {
           mutate(
             country_name = paste(n, !!sym("country_name"), sep = " - "),
             trade_value_usd_exp = round(!!sym("trade_value_usd_exp") / 1e9, 2),
-            color = "#26667f"
+            color = "#67c090"
           ) %>%
           select(-n)
       } else {
@@ -1430,7 +1418,7 @@ mod_countries_server <- function(id) {
         d <- d %>%
           filter(
             !!sym("year") == !!max_year &
-            !!sym("reporter_iso") == !!inp_r()
+              !!sym("reporter_iso") == !!inp_r()
           )
 
         d <- d %>% collect()
@@ -1473,7 +1461,7 @@ mod_countries_server <- function(id) {
           mutate(
             color = case_when(
               !!sym("country_name") == !!pname() ~ "#d04e66",
-              TRUE ~ "#26667f"
+              TRUE ~ "#67c090"
             )
           )
 
@@ -1494,18 +1482,18 @@ mod_countries_server <- function(id) {
       }
 
       d3po(d) %>%
-          po_bar(
-            daes(
-              y = .data$country_name,
-              x = .data$trade_value_usd_exp,
-              color = .data$color,
-              sort = "asc-y"
-            )
-          ) %>%
-          po_labels(title = exp_col_max_yr_usd_tt(), x = NULL, y = "Trade Value (USD Billion)") %>%
-          po_format(x = format(.data$trade_value_usd_exp, big.mark = " ", scientific = FALSE)) %>%
-          po_tooltip("{country_name}: {trade_value_usd_exp} B") %>%
-          po_background("transparent")
+        po_bar(
+          daes(
+            y = .data$country_name,
+            x = .data$trade_value_usd_exp,
+            color = .data$color,
+            sort = "asc-y"
+          )
+        ) %>%
+        po_labels(title = exp_col_max_yr_usd_tt(), x = NULL, y = "Trade Value (USD Billion)") %>%
+        po_format(x = format(.data$trade_value_usd_exp, big.mark = " ", scientific = FALSE)) %>%
+        po_tooltip("{country_name}: {trade_value_usd_exp} B") %>%
+        po_background("transparent")
     }) %>%
       bindCache(inp_y(), inp_r(), inp_p(), inp_d()) %>%
       bindEvent(input$go)
@@ -1666,7 +1654,74 @@ mod_countries_server <- function(id) {
             trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
             .groups = "drop"
           ) %>%
-          mutate(color = "#85cca6")
+          mutate(color = "#26667f")
+
+        d <- d %>%
+          filter(!!sym("country_name") == "Rest of the world") %>%
+          mutate(n = 5L) %>%
+          bind_rows(
+            d %>%
+              filter(!!sym("country_name") != "Rest of the world") %>%
+              arrange(desc(!!sym("trade_value_usd_imp"))) %>%
+              mutate(n = row_number())
+          ) %>%
+          mutate(
+            country_name = paste(n, !!sym("country_name"), sep = " - "),
+            trade_value_usd_imp = round(!!sym("trade_value_usd_imp") / 1e9, 2),
+            color = "#26667f"
+          ) %>%
+          select(-n)
+      } else {
+        # Show top 4 destinations + selected partner + "Rest of the world" for bilateral trade
+        d <- d %>%
+          filter(
+            !!sym("year") == !!min_year &
+              !!sym("reporter_iso") == !!inp_r()
+          )
+
+        d <- d %>% collect()
+
+        d <- d %>%
+          inner_join(
+            tbl(con, "countries") %>%
+              select(!!sym("country_iso"), !!sym("country_name")) %>%
+              collect(),
+            by = c("partner_iso" = "country_iso")
+          )
+
+        if (inp_d() != "No") {
+          d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
+        }
+
+        d <- d %>%
+          group_by(!!sym("country_name")) %>%
+          summarise(
+            trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
+            .groups = "drop"
+          ) %>%
+          filter(!!sym("trade_value_usd_imp") > 0) %>%
+          arrange(
+            desc(!!sym("trade_value_usd_imp"))
+          ) %>%
+          mutate(
+            n = row_number(),
+            country_name = case_when(
+              n <= 4L ~ !!sym("country_name"),
+              !!sym("country_name") == !!pname() ~ !!sym("country_name"),
+              TRUE ~ "Rest of the world"
+            )
+          ) %>%
+          group_by(!!sym("country_name")) %>%
+          summarise(
+            trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
+            .groups = "drop"
+          ) %>%
+          mutate(
+            color = case_when(
+              !!sym("country_name") == !!pname() ~ "#d04e66",
+              TRUE ~ "#26667f"
+            )
+          )
 
         d <- d %>%
           filter(!!sym("country_name") == "Rest of the world") %>%
@@ -1682,82 +1737,21 @@ mod_countries_server <- function(id) {
             trade_value_usd_imp = round(!!sym("trade_value_usd_imp") / 1e9, 2)
           ) %>%
           select(-n)
-
-        d3po(d) %>%
-          po_bar(
-            daes(
-              y = .data$country_name,
-              x = .data$trade_value_usd_imp,
-              color = .data$color,
-              sort = "asc-y"
-            )
-          ) %>%
-          po_labels(
-            title = imp_col_min_yr_usd_tt(),
-            y = "Country",
-            x = "Trade Value (USD Billion)"
-          ) %>%
-          po_format(x = format(.data$trade_value_usd_imp, big.mark = " ", scientific = FALSE)) %>%
-          po_tooltip("{country_name}: {trade_value_usd_imp} B") %>%
-          po_background("transparent")
-      } else {
-        # Show top 4 sections + "Other products" for bilateral trade
-        d <- d %>%
-          filter(
-            !!sym("year") == !!min_year &
-              !!sym("reporter_iso") == !!inp_r() &
-              !!sym("partner_iso") == !!inp_p()
-          )
-
-        d <- d %>%
-          inner_join(
-            tbl(con, "commodities") %>%
-              distinct(!!sym("commodity_code"), !!sym("section_code"), !!sym("section_name"), !!sym("section_color")),
-            by = c("commodity_code", "section_code")
-          ) %>%
-          collect()
-
-        if (inp_d() != "No") {
-          d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
-        }
-
-        d <- d %>%
-          group_by(!!sym("section_name")) %>%
-          summarise(
-            trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
-            .groups = "drop"
-          ) %>%
-          filter(!!sym("trade_value_usd_imp") > 0) %>%
-          mutate(section_name = fct_lump_n(
-            f = !!sym("section_name"),
-            n = 4,
-            w = !!sym("trade_value_usd_imp"),
-            other_level = "Other products"
-          )) %>%
-          group_by(!!sym("section_name")) %>%
-          summarise(
-            trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
-            .groups = "drop"
-          ) %>%
-          mutate(
-            section_name = factor(!!sym("section_name"),
-              levels = c(setdiff(unique(!!sym("section_name")), "Other products"), "Other products")),
-            trade_value_usd_imp = round(!!sym("trade_value_usd_imp") / 1e9, 2)
-          )
-
-        d3po(d) %>%
-          po_bar(
-            daes(
-              y = .data$section_name,
-              x = .data$trade_value_usd_imp,
-              color = "#91d1ae"
-            )
-          ) %>%
-          po_labels(title = imp_col_min_yr_usd_tt(), x = NULL, y = "Trade Value (USD Billion)") %>%
-          po_format(y = format(.data$trade_value_usd_imp, big.mark = " ", scientific = FALSE)) %>%
-          po_tooltip("{section_name}: {trade} B") %>%
-          po_background("transparent")
       }
+
+      d3po(d) %>%
+        po_bar(
+          daes(
+            y = .data$country_name,
+            x = .data$trade_value_usd_imp,
+            color = .data$color,
+            sort = "asc-y"
+          )
+        ) %>%
+        po_labels(title = imp_col_min_yr_usd_tt(), x = NULL, y = "Trade Value (USD Billion)") %>%
+        po_format(x = format(.data$trade_value_usd_imp, big.mark = " ", scientific = FALSE)) %>%
+        po_tooltip("{country_name}: {trade_value_usd_imp} B") %>%
+        po_background("transparent")
     }) %>%
       bindCache(inp_y(), inp_r(), inp_p(), inp_d()) %>%
       bindEvent(input$go)
@@ -1806,7 +1800,74 @@ mod_countries_server <- function(id) {
             trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
             .groups = "drop"
           ) %>%
-          mutate(color = "#67c090")
+          mutate(color = "#26667f")
+
+        d <- d %>%
+          filter(!!sym("country_name") == "Rest of the world") %>%
+          mutate(n = 5L) %>%
+          bind_rows(
+            d %>%
+              filter(!!sym("country_name") != "Rest of the world") %>%
+              arrange(desc(!!sym("trade_value_usd_imp"))) %>%
+              mutate(n = row_number())
+          ) %>%
+          mutate(
+            country_name = paste(n, !!sym("country_name"), sep = " - "),
+            trade_value_usd_imp = round(!!sym("trade_value_usd_imp") / 1e9, 2),
+            color = "#26667f"
+          ) %>%
+          select(-n)
+      } else {
+        # Show top 4 destinations + selected partner + "Rest of the world" for bilateral trade
+        d <- d %>%
+          filter(
+            !!sym("year") == !!max_year &
+              !!sym("reporter_iso") == !!inp_r()
+          )
+
+        d <- d %>% collect()
+
+        d <- d %>%
+          inner_join(
+            tbl(con, "countries") %>%
+              select(!!sym("country_iso"), !!sym("country_name")) %>%
+              collect(),
+            by = c("partner_iso" = "country_iso")
+          )
+
+        if (inp_d() != "No") {
+          d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
+        }
+
+        d <- d %>%
+          group_by(!!sym("country_name")) %>%
+          summarise(
+            trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
+            .groups = "drop"
+          ) %>%
+          filter(!!sym("trade_value_usd_imp") > 0) %>%
+          arrange(
+            desc(!!sym("trade_value_usd_imp"))
+          ) %>%
+          mutate(
+            n = row_number(),
+            country_name = case_when(
+              n <= 4L ~ !!sym("country_name"),
+              !!sym("country_name") == !!pname() ~ !!sym("country_name"),
+              TRUE ~ "Rest of the world"
+            )
+          ) %>%
+          group_by(!!sym("country_name")) %>%
+          summarise(
+            trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
+            .groups = "drop"
+          ) %>%
+          mutate(
+            color = case_when(
+              !!sym("country_name") == !!pname() ~ "#d04e66",
+              TRUE ~ "#26667f"
+            )
+          )
 
         d <- d %>%
           filter(!!sym("country_name") == "Rest of the world") %>%
@@ -1822,79 +1883,21 @@ mod_countries_server <- function(id) {
             trade_value_usd_imp = round(!!sym("trade_value_usd_imp") / 1e9, 2)
           ) %>%
           select(-n)
-
-        d3po(d) %>%
-          po_bar(
-            daes(
-              y = .data$country_name,
-              x = .data$trade_value_usd_imp,
-              color = .data$color,
-              sort = "asc-y"
-            )
-          ) %>%
-          po_labels(
-            title = imp_col_max_yr_usd_tt(),
-            y = "Country",
-            x = "Trade Value (USD Billion)"
-          ) %>%
-          po_format(x = format(.data$trade_value_usd_imp, big.mark = " ", scientific = FALSE)) %>%
-          po_tooltip("{country_name}: {trade_value_usd_imp} B") %>%
-          po_background("transparent")
-      } else {
-        # Show top 4 sections + "Other products" for bilateral trade
-        d <- d %>%
-          filter(
-            !!sym("year") == !!max_year &
-              !!sym("reporter_iso") == !!inp_r() &
-              !!sym("partner_iso") == !!inp_p()
-          )
-
-        d <- d %>%
-          inner_join(
-            tbl(con, "commodities") %>%
-              distinct(!!sym("commodity_code"), !!sym("section_code"), !!sym("section_name"), !!sym("section_color")),
-            by = c("commodity_code", "section_code")
-          ) %>%
-          collect()
-
-        if (inp_d() != "No") {
-          d <- gdp_deflator_adjustment(d, as.integer(inp_d()), con = con)
-        }
-
-        d <- d %>%
-          group_by(!!sym("section_name")) %>%
-          summarise(
-            trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
-            .groups = "drop"
-          ) %>%
-          filter(!!sym("trade_value_usd_imp") > 0) %>%
-          mutate(section_name = fct_lump_n(
-            f = !!sym("section_name"),
-            n = 4,
-            w = !!sym("trade_value_usd_imp"),
-            other_level = "Other products"
-          )) %>%
-          group_by(!!sym("section_name")) %>%
-          summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
-          mutate(
-            section_name = factor(!!sym("section_name"),
-              levels = c(setdiff(unique(!!sym("section_name")), "Other products"), "Other products")),
-              trade_value_usd_imp = round(!!sym("trade_value_usd_imp") / 1e9, 2)
-          )
-
-        d3po(d) %>%
-          po_bar(
-            daes(
-              y = .data$section_name,
-              x = .data$trade_value_usd_imp,
-              color = "#91d1ae"
-            )
-          ) %>%
-          po_labels(title = imp_col_max_yr_usd_tt(), x = NULL, y = "Trade Value (USD Billion)") %>%
-          po_format(y = format(.data$trade_value_usd_imp, big.mark = " ", scientific = FALSE)) %>%
-          po_tooltip("{section_name}: {trade} B") %>%
-          po_background("transparent")
       }
+
+      d3po(d) %>%
+        po_bar(
+          daes(
+            y = .data$country_name,
+            x = .data$trade_value_usd_imp,
+            color = .data$color,
+            sort = "asc-y"
+          )
+        ) %>%
+        po_labels(title = imp_col_max_yr_usd_tt(), x = NULL, y = "Trade Value (USD Billion)") %>%
+        po_format(x = format(.data$trade_value_usd_imp, big.mark = " ", scientific = FALSE)) %>%
+        po_tooltip("{country_name}: {trade_value_usd_imp} B") %>%
+        po_background("transparent")
     }) %>%
       bindCache(inp_y(), inp_r(), inp_p(), inp_d()) %>%
       bindEvent(input$go)
