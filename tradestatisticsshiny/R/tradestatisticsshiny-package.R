@@ -3,7 +3,7 @@
 #' @importFrom shiny shinyOptions
 #' @importFrom dplyr arrange bind_rows case_when coalesce collect dense_rank desc
 #'     distinct everything filter group_by inner_join last left_join mutate mutate_if
-#'     pull rename select slice_head summarise tbl tibble ungroup
+#'     pull rename row_number select slice_head summarise tbl tibble ungroup
 #' @importFrom forcats fct_lump_n
 #' @importFrom glue glue
 #' @importFrom golem add_resource_path activate_js favicon bundle_resources with_golem_options
@@ -19,7 +19,7 @@
 #'     observeEvent renderText renderUI updateSelectizeInput downloadHandler req
 #'     shinyApp
 #' @importFrom shinyhelper helper observe_helpers
-#' @importFrom shinyjs hide show useShinyjs
+#' @importFrom shinyjs hide hidden show useShinyjs
 #' @importFrom stats setNames
 #' @importFrom tidyr pivot_longer
 #' @importFrom waiter useWaiter Waiter spin_3 transparent

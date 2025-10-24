@@ -8,44 +8,45 @@
 #' @noRd
 app_ui <- function(request) {
   tagList(
-    # Leave this function for adding external resources
+    # External resources
     golem_add_external_resources(),
+
     # Your application UI logic using tabler
-    tablerPage(
+    tabler_page(
       title = "Open Trade Statistics",
       layout = "fluid-vertical",
-      navbar = tablerSidebar(
+      navbar = tabler_sidebar(
         title = "Open Trade Statistics",
-        useShinyjs(),
-        useWaiter(),
-        sidebarMenu(
-          menuItem("Welcome", tabName = "welcome"),
-          menuItem("Countries", tabName = "co"),
-          menuItem("Products", tabName = "pr"),
-          menuItem("Cite", tabName = "cite")
+        sidebar_menu(
+          useShinyjs(),
+          useWaiter(),
+          menu_item("Welcome", tab_name = "welcome"),
+          menu_item("Countries", tab_name = "co"),
+          # menu_item("Products", tab_name = "pr"),
+          menu_item("Cite", tab_name = "cite")
         )
       ),
-      body = tablerBody(
-        tablerTabItems(
-          tablerTabItem(
-            tabName = "welcome",
+      body = tabler_body(
+        tabler_tab_items(
+          tabler_tab_item(
+            tab_name = "welcome",
             mod_welcome_ui("welcome")
           ),
-          tablerTabItem(
-            tabName = "co",
+          tabler_tab_item(
+            tab_name = "co",
             mod_countries_ui("co")
           ),
-          tablerTabItem(
-            tabName = "pr",
-            mod_products_ui("pr")
-          ),
-          tablerTabItem(
-            tabName = "cite",
+          # tabler_tab_item(
+          #   tab_name = "pr",
+          #   mod_products_ui("pr")
+          # ),
+          tabler_tab_item(
+            tab_name = "cite",
             mod_cite_ui("cite")
           )
         )
       ),
-      footer = tablerFooter(left = "Made by Mauricio 'Pacha' Vargas Sepulveda", right = paste("Open Trade Statistics", get_year()))
+      footer = tabler_footer(left = "Made by Mauricio 'Pacha' Vargas Sepulveda", right = paste("Open Trade Statistics", get_year()))
     ),
     tags$footer(
       tags$link(rel = "shortcut icon", href = "img/favicon.ico")
@@ -66,19 +67,23 @@ golem_add_external_resources <- function() {
     app_sys("app/www")
   )
 
+  # Add JavaScript to add an id to the <section> tag
+  # so we can overlay waiter on top of it
+  add_id_to_section <- "
+  $( document ).ready(function() {
+    var section = document.getElementsByClassName('page-body');
+    section[0].setAttribute('id', 'waiter-content');
+  });"
+
   tags$head(
     favicon(),
-    # Add JavaScript to add an id to the <section> tag so we can overlay
-    # waiter on top of it. Run this before bundled resources (including
-    # waiter.js) so the element exists when waiter initializes. Add a
-    # small retry in case the element is added slightly later.
-    tags$script(HTML("(function(){\n  function setWaiterId(){\n    var section = document.getElementsByClassName('content');\n    if (section && section.length > 0) {\n      section[0].setAttribute('id', 'waiter-content');\n      return true;\n    }\n    return false;\n  }\n  if (!setWaiterId()) {\n    var tries = 0;\n    var t = setInterval(function(){\n      tries++;\n      if (setWaiterId() || tries > 10) clearInterval(t);\n    }, 100);\n  }\n})();")),
     bundle_resources(
       path = app_sys("app/www"),
       app_title = "Open Trade Statistics"
     ),
     # Include custom JS that equalizes card heights where needed
     tags$script(src = "www/custom.js"),
+    tags$script(add_id_to_section),
     tags$style(
       ".waiter-overlay-content{
         position: absolute;

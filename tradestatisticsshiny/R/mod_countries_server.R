@@ -1,229 +1,4 @@
-#' countries UI Function
-#'
-#' @description A shiny Module.
-#'
-#' @param id,input,output,session Internal parameters for {shiny}.
-#'
-#' @noRd
-mod_countries_ui <- function(id) {
-  ns <- NS(id)
-  tagList(
-    useWaiter(),
-    fluidRow(
-      # Filter -----
-      col_12(
-        h2("Filter")
-      ),
-      col_3(
-        sliderInput(
-          ns("y"),
-          "Years",
-          min = available_yrs_min(),
-          max = available_yrs_max(),
-          value = c(2018, 2023),
-          sep = "",
-          step = 1,
-          ticks = FALSE,
-          width = "100%"
-        )
-      ),
-      col_3(
-        selectInput(
-          ns("r"),
-          "Reporter",
-          choices = sort(tradestatisticsshiny::reporters_display[
-            tradestatisticsshiny::reporters_display != "ALL"
-          ]),
-          selected = "GBR",
-          selectize = TRUE,
-          width = "100%"
-        )
-      ),
-      col_3(
-        selectInput(
-          ns("p"),
-          "Partner",
-          choices = c(
-            "All countries" = "ALL",
-            sort(tradestatisticsshiny::reporters_display[tradestatisticsshiny::reporters_display != "ALL"])
-          ),
-          selected = "ALL",
-          selectize = TRUE,
-          width = "100%"
-        )
-      ),
-      col_3(
-        selectInput(
-          ns("d"),
-          "Convert dollars to a fixed year",
-          choices = c("No", available_yrs_deflator()),
-          selected = "",
-          selectize = TRUE,
-          width = "100%"
-        ) %>%
-          helper(
-            type = "inline",
-            title = "Convert to dollars of the year",
-            content = c("Uses present value and/or future value equations to adjust money value
-                      by yearly changes in GDP deflator. The source for the GDP deflator data is The World Bank."),
-            buttonLabel = "Got it!",
-            easyClose = FALSE,
-            fade = TRUE,
-            size = "s"
-          )
-      ),
-      col_12(
-        align = "center",
-        br(),
-        actionButton(ns("go"), "Give me the country profile",
-          class = "btn-primary"
-        ),
-        br(),
-        br()
-      ),
-
-      # Trade ----
-
-      div(
-        fluidRow(
-          col_12(
-            htmlOutput(ns("title"), container = tags$h1)
-          )
-        )
-      ),
-
-      ## Aggregated trade -----
-
-      div(
-        id = ns("aggregated_trade"),
-        br(),
-        br(),
-        fluidRow(
-          class = "row-equal-height",
-          col_12(
-            tablerCard(
-              htmlOutput(ns("trd_stl"), container = tags$h2)
-            )
-          ),
-          col_4(
-            id = "aggregated_trade_left",
-            tablerCard(
-              htmlOutput(ns("trd_stl_exp"), container = tags$h4),
-              htmlOutput(ns("trd_smr_exp"), container = tags$p),
-              htmlOutput(ns("trd_stl_imp"), container = tags$h4),
-              htmlOutput(ns("trd_smr_imp"), container = tags$p)
-            )
-          ),
-          col_8(
-            id = "aggregated_trade_right",
-            tablerCard(
-              d3po_output(ns("trd_exc_columns_agg"), height = "500px")
-            )
-          )
-        )
-      ),
-
-      ## Detailed trade ----
-
-      div(
-        id = ns("detailed_trade_exp"),
-        br(),
-        br(),
-        fluidRow(
-          class = "row-equal-height",
-          ## Exports ----
-          col_12(
-            tablerCard(
-              htmlOutput(ns("exp_tt_yr"), container = tags$h2)
-            )
-          ),
-          col_6(
-            id = "detailed_trade_col_exp_usd_left",
-            tablerCard(
-              d3po_output(ns("exp_col_min_yr_usd"), height = "400px")
-            )
-          ),
-          col_6(
-            id = "detailed_trade_col_exp_usd_right",
-            tablerCard(
-              d3po_output(ns("exp_col_max_yr_usd"), height = "400px")
-            )
-          ),
-          col_6(
-            id = "detailed_trade_tm_exp_left",
-            tablerCard(
-              d3po_output(ns("exp_tm_dtl_min_yr"), height = "500px")
-            )
-          ),
-          col_6(
-            id = "detailed_trade_tm_exp_right",
-            tablerCard(
-              d3po_output(ns("exp_tm_dtl_max_yr"), height = "500px")
-            )
-          )
-        )
-      ),
-      div(
-        id = ns("detailed_trade_imp"),
-        br(),
-        br(),
-        fluidRow(
-          ## Imports ----
-          col_12(
-            tablerCard(
-              htmlOutput(ns("imp_tt_yr"), container = tags$h2)
-            )
-          ),
-          col_6(
-            id = "detailed_trade_col_imp_usd_left",
-            tablerCard(
-              d3po_output(ns("imp_col_min_yr_usd"), height = "400px")
-            )
-          ),
-          col_6(
-            id = "detailed_trade_col_imp_usd_right",
-            tablerCard(
-              d3po_output(ns("imp_col_max_yr_usd"), height = "400px")
-            )
-          ),
-          col_6(
-            id = "detailed_trade_tm_imp_left",
-            tablerCard(
-              d3po_output(ns("imp_tm_dtl_min_yr"), height = "500px")
-            )
-          ),
-          col_6(
-            id = "detailed_trade_tm_imp_right",
-            tablerCard(
-              d3po_output(ns("imp_tm_dtl_max_yr"), height = "500px")
-            )
-          )
-        )
-      ),
-
-      ## Download ----
-      div(
-        id = "download_data",
-        br(),
-        br(),
-        fluidRow(
-          col_12(tablerCard(
-            htmlOutput(ns("dwn_stl"), container = tags$h2),
-            htmlOutput(ns("dwn_txt"), container = tags$p),
-            uiOutput(ns("dwn_fmt")),
-            br(),
-            uiOutput(ns("dwn_agg")),
-            br(),
-            uiOutput(ns("dwn_dtl"))
-          ))
-        )
-      )
-    )
-  )
-}
-
-#' countries Server Functions
-#'
+#' @title countries-server
 #' @noRd
 mod_countries_server <- function(id) {
   moduleServer(id, function(input, output, session) {
@@ -249,21 +24,17 @@ mod_countries_server <- function(id) {
     inp_r <- reactive({
       input$r
     }) # reporter
-
     inp_p <- reactive({
       input$p
     }) # partner
-
     inp_d <- reactive({
       input$d
     }) # adjust dollar
-
     inp_fmt <- reactive({
       input$fmt
     }) # format
 
     tbl_agg <- "yrp"
-
     tbl_dtl <- "yrpc"
 
     # Human-readable reporter/partner names for glue templates. Fallback to
@@ -1262,11 +1033,11 @@ mod_countries_server <- function(id) {
               mutate(n = row_number())
           ) %>%
           mutate(
-            country_name = paste(n, !!sym("country_name"), sep = " - "),
+            country_name = paste(!!sym("n"), !!sym("country_name"), sep = " - "),
             trade_value_usd_exp = round(!!sym("trade_value_usd_exp") / 1e9, 2),
             color = "#67c090"
           ) %>%
-          select(-n)
+          select(-!!sym("n"))
       } else {
         # Show top 4 destinations + selected partner + "Rest of the world" for bilateral trade
         d <- d %>%
@@ -1302,7 +1073,7 @@ mod_countries_server <- function(id) {
           mutate(
             n = row_number(),
             country_name = case_when(
-              n <= 4L ~ !!sym("country_name"),
+              !!sym("n") <= 4L ~ !!sym("country_name"),
               !!sym("country_name") == !!pname() ~ !!sym("country_name"),
               TRUE ~ "Rest of the world"
             )
@@ -1329,10 +1100,10 @@ mod_countries_server <- function(id) {
               mutate(n = row_number())
           ) %>%
           mutate(
-            country_name = paste(n, !!sym("country_name"), sep = " - "),
+            country_name = paste(!!sym("n"), !!sym("country_name"), sep = " - "),
             trade_value_usd_exp = round(!!sym("trade_value_usd_exp") / 1e9, 2)
           ) %>%
-          select(-n)
+          select(-!!sym("n"))
       }
 
       d3po(d) %>%
@@ -1408,11 +1179,11 @@ mod_countries_server <- function(id) {
               mutate(n = row_number())
           ) %>%
           mutate(
-            country_name = paste(n, !!sym("country_name"), sep = " - "),
+            country_name = paste(!!sym("n"), !!sym("country_name"), sep = " - "),
             trade_value_usd_exp = round(!!sym("trade_value_usd_exp") / 1e9, 2),
             color = "#67c090"
           ) %>%
-          select(-n)
+          select(-!!sym("n"))
       } else {
         # Show top 4 destinations + selected partner + "Rest of the world" for bilateral trade
         d <- d %>%
@@ -1448,7 +1219,7 @@ mod_countries_server <- function(id) {
           mutate(
             n = row_number(),
             country_name = case_when(
-              n <= 4L ~ !!sym("country_name"),
+              !!sym("n") <= 4L ~ !!sym("country_name"),
               !!sym("country_name") == !!pname() ~ !!sym("country_name"),
               TRUE ~ "Rest of the world"
             )
@@ -1475,10 +1246,10 @@ mod_countries_server <- function(id) {
               mutate(n = row_number())
           ) %>%
           mutate(
-            country_name = paste(n, !!sym("country_name"), sep = " - "),
+            country_name = paste(!!sym("n"), !!sym("country_name"), sep = " - "),
             trade_value_usd_exp = round(!!sym("trade_value_usd_exp") / 1e9, 2)
           ) %>%
-          select(-n)
+          select(-!!sym("n"))
       }
 
       d3po(d) %>%
@@ -1497,60 +1268,6 @@ mod_countries_server <- function(id) {
     }) %>%
       bindCache(inp_y(), inp_r(), inp_p(), inp_d()) %>%
       bindEvent(input$go)
-
-    # top_sections: return a data.frame with 9 largest sections + 'other' and colors
-    top_sections <- reactive({
-      req(inp_y())
-
-      # compute exchange (exports + imports) by section across selected years
-      totals <- df_dtl() %>%
-        filter(!!sym("year") %in% !!inp_y()) %>%
-        group_by(!!sym("section_code"), !!sym("section_name"), !!sym("section_color")) %>%
-        summarise(
-          exchange = sum(!!sym("trade_value_usd_exp") + !!sym("trade_value_usd_imp"), na.rm = TRUE),
-          .groups = "drop"
-        ) %>%
-        arrange(desc(!!sym("exchange")))
-
-      # top 9 codes by exchange
-      top9 <- totals %>% slice_head(n = 9)
-
-      out <- top9 %>% select(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"))
-      # append canonical 'Other products' at the end
-      out <- bind_rows(out, tibble(section_code = "other", section_name = "Other products", section_color = "#434348"))
-      out
-    })
-
-    # section totals for the most recent year
-    section_totals_recent <- reactive({
-      req(inp_y())
-
-      yr <- max(inp_y())
-
-      d <- df_dtl() %>%
-        filter(!!sym("year") == !!yr) %>%
-        group_by(!!sym("section_code")) %>%
-        summarise(
-          trade_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE),
-          trade_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
-          .groups = "drop"
-        ) %>%
-        mutate(exchange = !!sym("trade_exp") + !!sym("trade_imp"))
-
-      # join canonical mapping (if available) and provide defaults
-      cs <- tryCatch(top_sections(), error = function(e) NULL)
-      if (!is.null(cs)) {
-        d <- d %>%
-          left_join(cs, by = "section_code") %>%
-          mutate(
-            section_name = coalesce(!!sym("section_name"), "Other products"),
-            section_color = coalesce(!!sym("section_color"), "#434348")
-          ) %>%
-          select(!!sym("section_code"), !!sym("section_name"), !!sym("section_color"), !!sym("trade_exp"), !!sym("trade_imp"), !!sym("exchange"))
-      }
-
-      d
-    })
 
     exp_tt_min_yr <- eventReactive(input$go, {
       glue("Exports in { min(inp_y()) }")
@@ -1666,11 +1383,11 @@ mod_countries_server <- function(id) {
               mutate(n = row_number())
           ) %>%
           mutate(
-            country_name = paste(n, !!sym("country_name"), sep = " - "),
+            country_name = paste(!!sym("n"), !!sym("country_name"), sep = " - "),
             trade_value_usd_imp = round(!!sym("trade_value_usd_imp") / 1e9, 2),
             color = "#26667f"
           ) %>%
-          select(-n)
+          select(-!!sym("n"))
       } else {
         # Show top 4 destinations + selected partner + "Rest of the world" for bilateral trade
         d <- d %>%
@@ -1706,7 +1423,7 @@ mod_countries_server <- function(id) {
           mutate(
             n = row_number(),
             country_name = case_when(
-              n <= 4L ~ !!sym("country_name"),
+              !!sym("n") <= 4L ~ !!sym("country_name"),
               !!sym("country_name") == !!pname() ~ !!sym("country_name"),
               TRUE ~ "Rest of the world"
             )
@@ -1733,10 +1450,10 @@ mod_countries_server <- function(id) {
               mutate(n = row_number())
           ) %>%
           mutate(
-            country_name = paste(n, !!sym("country_name"), sep = " - "),
+            country_name = paste(!!sym("n"), !!sym("country_name"), sep = " - "),
             trade_value_usd_imp = round(!!sym("trade_value_usd_imp") / 1e9, 2)
           ) %>%
-          select(-n)
+          select(-!!sym("n"))
       }
 
       d3po(d) %>%
@@ -1812,11 +1529,11 @@ mod_countries_server <- function(id) {
               mutate(n = row_number())
           ) %>%
           mutate(
-            country_name = paste(n, !!sym("country_name"), sep = " - "),
+            country_name = paste(!!sym("n"), !!sym("country_name"), sep = " - "),
             trade_value_usd_imp = round(!!sym("trade_value_usd_imp") / 1e9, 2),
             color = "#26667f"
           ) %>%
-          select(-n)
+          select(-!!sym("n"))
       } else {
         # Show top 4 destinations + selected partner + "Rest of the world" for bilateral trade
         d <- d %>%
@@ -1852,7 +1569,7 @@ mod_countries_server <- function(id) {
           mutate(
             n = row_number(),
             country_name = case_when(
-              n <= 4L ~ !!sym("country_name"),
+              !!sym("n") <= 4L ~ !!sym("country_name"),
               !!sym("country_name") == !!pname() ~ !!sym("country_name"),
               TRUE ~ "Rest of the world"
             )
@@ -1879,10 +1596,10 @@ mod_countries_server <- function(id) {
               mutate(n = row_number())
           ) %>%
           mutate(
-            country_name = paste(n, !!sym("country_name"), sep = " - "),
+            country_name = paste(!!sym("n"), !!sym("country_name"), sep = " - "),
             trade_value_usd_imp = round(!!sym("trade_value_usd_imp") / 1e9, 2)
           ) %>%
-          select(-n)
+          select(-!!sym("n"))
       }
 
       d3po(d) %>%
@@ -2092,11 +1809,11 @@ mod_countries_server <- function(id) {
     ## observe the button being pressed
     observeEvent(input$go, {
       if (input$go > 0) {
+        show(id = "title_section")
         show(id = "aggregated_trade")
-        show(id = "detailed_trade")
-      } else {
-        hide(id = "aggregated_trade")
-        hide(id = "detailed_trade")
+        show(id = "detailed_trade_exp")
+        show(id = "detailed_trade_imp")
+        show(id = "downloads_data")
       }
     })
   })
