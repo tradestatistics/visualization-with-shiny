@@ -4,12 +4,14 @@
 \alias{p_treemap}
 \title{Product Treemap}
 \usage{
-p_treemap(d, d2)
+p_treemap(d, d2, title = NULL)
 }
 \arguments{
 \item{d}{input dataset for values}
 
 \item{d2}{input dataset for colours}
+
+\item{title}{title for the treemap}
 }
 \description{
 Product Treemap

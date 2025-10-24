@@ -1,7 +1,6 @@
-#' products-ui
+#' @title Product profile UI Function
 #' @description A shiny Module.
-#' @param id,input,output,session Internal parameters for {shiny}.
-#' @noRd
+#' @param id Internal parameter for Shiny.
 mod_products_ui <- function(id) {
   ns <- NS(id)
   tagList(

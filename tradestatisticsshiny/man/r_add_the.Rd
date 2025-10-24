@@ -13,6 +13,6 @@ r_add_the(name = NULL)
 Character string: "the" for names requiring the article, empty string otherwise
 }
 \description{
-Grammar helper function that adds "the" for reporter names that typically
-take the definite article (e.g., "United States", "Russian Federation").
+Grammar helper function that adds "the" for reporter names such as
+"United Kingdom" and "United States"
 }

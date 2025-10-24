@@ -1,10 +1,6 @@
-#' welcome UI Function
-#'
+#' @title Welcome UI Function
 #' @description A shiny Module.
-#'
-#' @param id,input,output,session Internal parameters for {shiny}.
-#'
-#' @noRd
+#' @param id Internal parameters for Shiny.
 mod_welcome_ui <- function(id) {
   ns <- NS(id)
   tagList(

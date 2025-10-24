@@ -1,6 +1,6 @@
-#' @title countries-ui
-#' @param id,input,output,session Internal parameters for {shiny}.
-#' @noRd
+#' @title Country profile UI-side function
+#' @description A shiny Module.
+#' @param id Internal parameter for Shiny.
 mod_countries_ui <- function(id) {
   ns <- NS(id)
   tagList(
@@ -208,7 +208,7 @@ mod_countries_ui <- function(id) {
         ## Download ----
         hidden(
           div(
-            id = "download_data",
+            id = ns("download_data"),
             br(),
             br(),
             fluidRow(

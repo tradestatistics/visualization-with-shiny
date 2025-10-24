@@ -1,10 +1,5 @@
-#' cite UI Function
-#'
-#' @description A shiny Module.
-#'
-#' @param id,input,output,session Internal parameters for {shiny}.
-#'
-#' @noRd
+#' @title Citation UI-side function
+#' @param id Internal parameters for Shiny.
 mod_cite_ui <- function(id) {
   ns <- NS(id)
   # Static metadata for the dashboard so reference managers (Zotero) can detect it
@@ -41,9 +36,8 @@ mod_cite_ui <- function(id) {
   )
 }
 
-#' cite Server Functions
-#'
-#' @noRd
+#' @title Citation server-side function
+#' @param id Internal parameter for Shiny.
 mod_cite_server <- function(id) {
   moduleServer(id, function(input, output, session) {
     # configurable metadata (change these variables if you want different values)

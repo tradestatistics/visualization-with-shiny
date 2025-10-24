@@ -1,9 +1,9 @@
-#' Available Server parameters expressed as functions
+#' @title Available Server parameters expressed as functions
 available_formats <- function() {
   c("csv", "tsv", "xlsx", "sav", "dta")
 }
 
-#' SQL connection
+#' @title SQL connection
 sql_con <- function() {
   dbPool(
     drv = Postgres(),
@@ -17,13 +17,26 @@ sql_con <- function() {
 
 # TIME ----
 
+#' @title Get Current Year
 get_year <- function() {
   as.numeric(format(Sys.Date(), "%Y"))
 }
 
+# DATA VALIDATION ----
+
+#' @title Ensure data frame contains expected columns to avoid mutate/group_by errors
+#' @param df input data frame
+#' @param cols vector of expected column names
+ensure_cols <- function(df, cols) {
+  for (c in cols) {
+    if (!c %in% names(df)) df[[c]] <- NA_character_
+  }
+  df
+}
+
 # ORIGIN/DESTINATION TREEMAPS -----
 
-#' Origin-Destination Treemap
+#' @title Origin-Destination Treemap
 #' @param d input dataset for values
 #' @param d2 input dataset for colours
 od_treemap <- function(d, d2) {
@@ -86,7 +99,7 @@ od_treemap <- function(d, d2) {
 
 # PRODUCT TREEMAPS ----
 
-#' Add Percentages to Sections
+#' @title Add Percentages to Sections
 #' @param d input dataset
 #' @param col column to collapse
 #' @param con SQL connection
@@ -125,7 +138,7 @@ p_aggregate_by_section <- function(d, col, con) {
   return(d)
 }
 
-#' Colorize Products
+#' @title Colorize Products
 #' @param d input dataset
 #' @param con SQL connection
 p_colors <- function(d, con) {
@@ -144,7 +157,7 @@ p_colors <- function(d, con) {
     )
 }
 
-#' Aggregate Products
+#' @title Aggregate Products
 #' @param d input dataset
 #' @param con SQL connection
 p_aggregate_products <- function(d, con) {
@@ -173,9 +186,10 @@ p_aggregate_products <- function(d, con) {
     ungroup()
 }
 
-#' Product Treemap
+#' @title Product Treemap
 #' @param d input dataset for values
 #' @param d2 input dataset for colours
+#' @param title title for the treemap
 p_treemap <- function(d, d2, title = NULL) {
   dd <- d %>%
     mutate(section_name = factor(!!sym("section_name"), levels = d2$section_name)) %>%
@@ -304,11 +318,9 @@ p_treemap <- function(d, d2, title = NULL) {
     po_background("transparent")
 }
 
-#' Add definite article for reporter names
-#'
-#' Grammar helper function that adds "the" for reporter names that typically
-#' take the definite article (e.g., "United States", "Russian Federation").
-#'
+#' @title Add definite article for reporter names
+#' @description Grammar helper function that adds "the" for reporter names such as
+#' "United Kingdom" and "United States"
 #' @param name Character string of the reporter name
 #' @return Character string: "the" for names requiring the article, empty string otherwise
 r_add_the <- function(name = NULL) {
@@ -322,11 +334,9 @@ r_add_the <- function(name = NULL) {
   ""
 }
 
-#' Add capitalized definite article for reporter names
-#'
-#' Grammar helper function that adds "The" (capitalized) for reporter names that
-#' typically take the definite article, used at the beginning of sentences.
-#'
+#' @title Add capitalized definite article for reporter names
+#' @description Grammar helper function that adds "The" (capitalized) for reporter names that
+#'  typically take the definite article, used at the beginning of sentences.
 #' @param name Character string of the reporter name
 #' @return Character string: "The" for names requiring the article, empty string otherwise
 r_add_upp_the <- function(name = NULL) {
@@ -340,7 +350,7 @@ r_add_upp_the <- function(name = NULL) {
 
 # FORMAT TEXTS ----
 
-#' Format for Dollars
+#' @title Format for Dollars
 #' @param x input number
 show_dollars <- function(x) {
   ifelse(x %/% 10e8 >= 1,
@@ -349,13 +359,13 @@ show_dollars <- function(x) {
   )
 }
 
-#' Format for Percentages
+#' @title Format for Percentages
 #' @param x input number
 show_percentage <- function(x) {
   paste0(round(100 * x, 2), "%")
 }
 
-#' Compute Compound Annualized Growth Rate
+#' @title Compute Compound Annualized Growth Rate
 #' @param p final value
 #' @param q initial value
 #' @param t time period
@@ -363,7 +373,7 @@ growth_rate <- function(p, q, t) {
   (p / q)^(1 / (max(t) - min(t))) - 1
 }
 
-#' Typing reactiveValues is too long
+#' @title Typing reactiveValues is too long
 #' @param ... elements to pass to the function
 #' @rdname reactives
 rv <- function(...) shiny::reactiveValues(...)

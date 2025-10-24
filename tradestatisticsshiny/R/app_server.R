@@ -1,25 +1,10 @@
-#' The application server-side
-#'
-#' @param input,output,session Internal parameters for {shiny}.
-#'     DO NOT REMOVE.
-#' @noRd
+#' @title The application server-side
+#' @param input,output,session Internal parameters for Shiny. DO NOT REMOVE.
 app_server <- function(input, output, session) {
   # Modules ----
   mod_countries_server("co")
   mod_products_server("pr")
   mod_cite_server("cite")
-
-  # Hide boxes until viz is ready ----
-
-  observeEvent(input$go, {
-    if (input$go > 0) {
-      show(id = "aggregated_trade")
-      show(id = "detailed_trade")
-    } else {
-      hide(id = "aggregated_trade")
-      hide(id = "detailed_trade")
-    }
-  })
 
   # Bookmarking ----
 
@@ -38,12 +23,3 @@ app_server <- function(input, output, session) {
     updateQueryString(url)
   })
 }
-
-#' Typing reactiveValues is too long
-#'
-#' @inheritParams reactiveValues
-#' @inheritParams reactiveValuesToList
-#'
-#' @noRd
-rv <- function(...) shiny::reactiveValues(...)
-rvtl <- function(...) shiny::reactiveValuesToList(...)

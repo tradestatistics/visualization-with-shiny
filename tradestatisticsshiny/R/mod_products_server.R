@@ -1,5 +1,6 @@
-#' @title products-server
-#' @noRd
+#' @title Product profile server-side function
+#' @description A shiny Module.
+#' @param id Internal parameter for Shiny.
 mod_products_server <- function(id) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
@@ -79,23 +80,23 @@ mod_products_server <- function(id) {
       scode <- inp_s()
 
       d <- tbl(con, tbl_agg) %>%
-        filter(year %in% yrs)
+        filter(!!sym("year") %in% yrs)
 
       # Apply section/commodity filter if specified (operate on local df)
       if (nchar(scode) == 4) {
         d <- d %>%
-          filter(substr(commodity_code, 1, 4) == scode)
+          filter(substr(!!sym("commodity_code"), 1, 4) == scode)
       } else if (nchar(scode) == 2) {
         d <- d %>%
-          filter(section_code == scode)
+          filter(!!sym("section_code") == scode)
       }
 
       # Use import data as measure of trade (more accurate from importer's perspective)
       d <- d %>%
-        group_by(year) %>%
+        group_by(!!sym("year")) %>%
         summarise(
-          trade_value_usd_exp = sum(trade_value_usd_exp, na.rm = TRUE),
-          trade_value_usd_imp = sum(trade_value_usd_imp, na.rm = TRUE),
+          trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE),
+          trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
           .groups = "drop"
         ) %>%
         collect()
@@ -116,39 +117,39 @@ mod_products_server <- function(id) {
 
       # Base data from yrpc table - use evaluated yrs variable
       d <- tbl(con, tbl_dtl) %>%
-        filter(year %in% yrs)
+        filter(!!sym("year") %in% yrs)
 
       # Apply section/commodity filter if specified (operate on local df)
       if (nchar(scode) == 4) {
         d <- d %>%
-          filter(substr(commodity_code, 1, 4) == scode)
+          filter(substr(!!sym("commodity_code"), 1, 4) == scode)
       } else if (nchar(scode) == 2) {
         d <- d %>%
-          filter(section_code == scode)
+          filter(!!sym("section_code") == scode)
       }
 
       # Get commodities reference data and collect early to avoid lazy evaluation issues
 
       commodities_ref <- tbl(con, "commodities") %>%
-        distinct(commodity_code, section_code, commodity_code_short)
+        distinct(!!sym("commodity_code"), !!sym("section_code"), !!sym("commodity_code_short"))
 
       # For imports: use direct import data (more accurate)
       d_imp <- d %>%
         inner_join(commodities_ref, by = c("commodity_code", "section_code")) %>%
-        select(-trade_value_usd_exp)
+        select(-!!sym("trade_value_usd_exp"))
 
       if (nchar(scode) == 4) {
         d_imp <- d_imp %>%
-          group_by(year, reporter_iso, partner_iso, commodity_code = commodity_code_short) %>%
+          group_by(!!sym("year"), !!sym("reporter_iso"), !!sym("partner_iso"), commodity_code = !!sym("commodity_code_short")) %>%
           summarise(
-            trade_value_usd_imp = sum(trade_value_usd_imp, na.rm = TRUE),
+            trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
             .groups = "drop"
           )
       } else if (nchar(scode) == 2) {
         d_imp <- d_imp %>%
-          group_by(year, reporter_iso, partner_iso, commodity_code = section_code) %>%
+          group_by(!!sym("year"), !!sym("reporter_iso"), !!sym("partner_iso"), commodity_code = !!sym("section_code")) %>%
           summarise(
-            trade_value_usd_imp = sum(trade_value_usd_imp, na.rm = TRUE),
+            trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
             .groups = "drop"
           )
       }
@@ -159,25 +160,25 @@ mod_products_server <- function(id) {
       d_exp <- d %>%
         inner_join(commodities_ref, by = c("commodity_code", "section_code")) %>%
         mutate(
-          original_reporter = reporter_iso,
-          reporter_iso = partner_iso, # Swap perspective: partner becomes reporter
-          partner_iso = original_reporter, # Original reporter becomes partner
-          trade_value_usd_exp = trade_value_usd_imp # Imports = exports from partners
+          original_reporter = !!sym("reporter_iso"),
+          reporter_iso = !!sym("partner_iso"), # Swap perspective: partner becomes reporter
+          partner_iso = !!sym("original_reporter"), # Original reporter becomes partner
+          trade_value_usd_exp = !!sym("trade_value_usd_imp") # Imports = exports from partners
         ) %>%
-        select(-trade_value_usd_imp)
+        select(-!!sym("trade_value_usd_imp"))
 
       if (nchar(scode) == 4) {
         d_exp <- d_exp %>%
-          group_by(year, reporter_iso, partner_iso, commodity_code = commodity_code_short) %>%
+          group_by(!!sym("year"), !!sym("reporter_iso"), !!sym("partner_iso"), commodity_code = !!sym("commodity_code_short")) %>%
           summarise(
-            trade_value_usd_exp = sum(trade_value_usd_exp, na.rm = TRUE),
+            trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE),
             .groups = "drop"
           )
       } else if (nchar(scode) == 2) {
         d_exp <- d_exp %>%
-          group_by(year, reporter_iso, partner_iso, commodity_code = section_code) %>%
+          group_by(!!sym("year"), !!sym("reporter_iso"), !!sym("partner_iso"), commodity_code = !!sym("section_code")) %>%
           summarise(
-            trade_value_usd_exp = sum(trade_value_usd_exp, na.rm = TRUE),
+            trade_value_usd_exp = sum(!!sym("trade_value_usd_exp"), na.rm = TRUE),
             .groups = "drop"
           )
       }
@@ -190,22 +191,22 @@ mod_products_server <- function(id) {
           )
         ) %>%
         mutate(
-          trade_value_usd_exp = ifelse(is.na(trade_value_usd_exp), 0, trade_value_usd_exp),
-          trade_value_usd_imp = ifelse(is.na(trade_value_usd_imp), 0, trade_value_usd_imp)
+          trade_value_usd_exp = ifelse(is.na(!!sym("trade_value_usd_exp")), 0, !!sym("trade_value_usd_exp")),
+          trade_value_usd_imp = ifelse(is.na(!!sym("trade_value_usd_imp")), 0, !!sym("trade_value_usd_imp"))
         )
 
       if (nchar(scode) == 4L) {
         d <- d %>%
           inner_join(
             tbl(con, "commodities") %>%
-              distinct(commodity_code = commodity_code_short, section_color),
+              distinct(commodity_code = !!sym("commodity_code_short"), !!sym("section_color")),
             by = "commodity_code"
           )
       } else if (nchar(scode) == 2) {
         d <- d %>%
           inner_join(
             tbl(con, "commodities") %>%
-              distinct(commodity_code = section_code, section_code, section_color),
+              distinct(commodity_code = !!sym("section_code"), !!sym("section_color")),
             by = "commodity_code"
           )
       }
@@ -229,32 +230,32 @@ mod_products_server <- function(id) {
     # Consolidated trade values calculation for efficiency
     trade_values <- eventReactive(input$go, {
       d <- df_agg() %>%
-        select(year, trade_value_usd_exp, trade_value_usd_imp) %>%
-        filter(year %in% c(min(inp_y()), max(inp_y())))
+        select(!!sym("year"), !!sym("trade_value_usd_exp"), !!sym("trade_value_usd_imp")) %>%
+        filter(!!sym("year") %in% c(min(inp_y()), max(inp_y())))
     })
 
     exp_val_min_yr <- eventReactive(input$go, {
       trade_values() %>%
-        filter(year == min(inp_y())) %>%
-        pull(trade_value_usd_exp)
+        filter(!!sym("year") == min(inp_y())) %>%
+        pull(!!sym("trade_value_usd_exp"))
     })
 
     exp_val_max_yr <- eventReactive(input$go, {
       trade_values() %>%
-        filter(year == max(inp_y())) %>%
-        pull(trade_value_usd_exp)
+        filter(!!sym("year") == max(inp_y())) %>%
+        pull(!!sym("trade_value_usd_exp"))
     })
 
     imp_val_min_yr <- eventReactive(input$go, {
       trade_values() %>%
-        filter(year == min(inp_y())) %>%
-        pull(trade_value_usd_imp)
+        filter(!!sym("year") == min(inp_y())) %>%
+        pull(!!sym("trade_value_usd_imp"))
     })
 
     imp_val_max_yr <- eventReactive(input$go, {
       trade_values() %>%
-        filter(year == max(inp_y())) %>%
-        pull(trade_value_usd_imp)
+        filter(!!sym("year") == max(inp_y())) %>%
+        pull(!!sym("trade_value_usd_imp"))
     })
 
     imp_val_min_yr_2 <- eventReactive(input$go, {
@@ -305,8 +306,8 @@ mod_products_server <- function(id) {
         flow = "Imports"
       ) %>%
         mutate(
-          year = as.character(year),
-          color = ifelse(flow == "Exports", "#67c090", "#26667f")
+          year = as.character(!!sym("year")),
+          color = ifelse(!!sym("flow") == "Exports", "#67c090", "#26667f")
         )
 
       d3po(d) %>%
@@ -365,26 +366,26 @@ mod_products_server <- function(id) {
 
       # Get countries reference data
       countries_data <- tbl(con, "countries") %>%
-        select(country_iso, country_name) %>%
+        select(!!sym("country_iso"), !!sym("country_name")) %>%
         collect()
 
       # Use import flow (trade_value_usd_imp) and partner_iso to identify exporters (more reliable)
       d <- df_dtl() %>%
-        filter(year == min_year) %>%
+        filter(!!sym("year") == min_year) %>%
         inner_join(countries_data, by = c("partner_iso" = "country_iso")) %>%
-        group_by(country_name) %>%
-        summarise(trade_value_usd_imp = sum(trade_value_usd_imp, na.rm = TRUE), .groups = "drop") %>%
-        filter(trade_value_usd_imp > 0) %>%
+        group_by(!!sym("country_name")) %>%
+        summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+        filter(!!sym("trade_value_usd_imp") > 0) %>%
         mutate(country_name = fct_lump_n(
-          f = country_name,
+          f = !!sym("country_name"),
           n = 4,
-          w = trade_value_usd_imp,
+          w = !!sym("trade_value_usd_imp"),
           other_level = "Rest of the world"
         )) %>%
-        group_by(country_name) %>%
-        summarise(trade_value_usd_imp = sum(trade_value_usd_imp, na.rm = TRUE), .groups = "drop") %>%
-        mutate(country_name = factor(country_name,
-          levels = c(setdiff(unique(country_name), "Rest of the world"), "Rest of the world")
+        group_by(!!sym("country_name")) %>%
+        summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+        mutate(country_name = factor(!!sym("country_name"),
+          levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
         ))
 
       d <- d %>% mutate(color = "#85cca6")
@@ -394,7 +395,8 @@ mod_products_server <- function(id) {
           daes(
             y = .data$country_name,
             x = .data$trade_value_usd_imp,
-            color = .data$color
+            color = .data$color,
+            sort = "asc-y"
           )
         ) %>%
         po_labels(
@@ -415,25 +417,28 @@ mod_products_server <- function(id) {
 
       # Get countries reference data
       countries_data <- tbl(con, "countries") %>%
-        select(country_iso, country_name) %>%
+        select(!!sym("country_iso"), !!sym("country_name")) %>%
         collect()
 
       d <- df_dtl() %>%
-        filter(year == max_year) %>%
+        filter(!!sym("year") == max_year) %>%
         inner_join(countries_data, by = c("partner_iso" = "country_iso")) %>%
-        group_by(country_name) %>%
-        summarise(trade_value_usd_imp = sum(trade_value_usd_imp, na.rm = TRUE), .groups = "drop") %>%
-        filter(trade_value_usd_imp > 0) %>%
+        group_by(!!sym("country_name")) %>%
+        summarise(
+          trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
+          .groups = "drop"
+        ) %>%
+        filter(!!sym("trade_value_usd_imp") > 0) %>%
         mutate(country_name = fct_lump_n(
-          f = country_name,
+          f = !!sym("country_name"),
           n = 4,
-          w = trade_value_usd_imp,
+          w = !!sym("trade_value_usd_imp"),
           other_level = "Rest of the world"
         )) %>%
-        group_by(country_name) %>%
-        summarise(trade_value_usd_imp = sum(trade_value_usd_imp, na.rm = TRUE), .groups = "drop") %>%
-        mutate(country_name = factor(country_name,
-          levels = c(setdiff(unique(country_name), "Rest of the world"), "Rest of the world")
+        group_by(!!sym("country_name")) %>%
+        summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+        mutate(country_name = factor(!!sym("country_name"),
+          levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
         ))
 
       d <- d %>% mutate(color = "#67c090")
@@ -468,23 +473,23 @@ mod_products_server <- function(id) {
 
       # Get countries reference data
       countries_data <- tbl(con, "countries") %>%
-        select(country_iso, country_name, continent_name, continent_color) %>%
+        select(!!sym("country_iso"), !!sym("country_name"), !!sym("continent_name"), !!sym("continent_color")) %>%
         collect()
 
       # Aggregate by countries instead of products for country treemap
       # Use import flow (trade_value_usd_imp) and partner_iso to identify exporters (more reliable)
       d <- df_dtl() %>%
-        filter(year == min_year) %>%
-        group_by(partner_iso) %>%
-        summarise(trade_value = sum(trade_value_usd_imp, na.rm = TRUE), .groups = "drop") %>%
+        filter(!!sym("year") == min_year) %>%
+        group_by(!!sym("partner_iso")) %>%
+        summarise(trade_value = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
         # Join with countries table to get country names and continent info
         inner_join(countries_data, by = c("partner_iso" = "country_iso"))
 
       # Create continent colors dataset
       d2 <- d %>%
-        select(continent_name, country_color = continent_color) %>%
+        select(!!sym("continent_name"), country_color = !!sym("continent_color")) %>%
         distinct() %>%
-        arrange(continent_name)
+        arrange(!!sym("continent_name"))
 
       od_treemap(d, d2)
     }) %>%
@@ -501,23 +506,23 @@ mod_products_server <- function(id) {
 
       # Get countries reference data
       countries_data <- tbl(con, "countries") %>%
-        select(country_iso, country_name, continent_name, continent_color) %>%
+        select(!!sym("country_iso"), !!sym("country_name"), !!sym("continent_name"), !!sym("continent_color")) %>%
         collect()
 
       # Aggregate by countries instead of products for country treemap
       # Use import flow (trade_value_usd_imp) and partner_iso to identify exporters (more reliable)
       d <- df_dtl() %>%
-        filter(year == max_year) %>%
-        group_by(partner_iso) %>%
-        summarise(trade_value = sum(trade_value_usd_imp, na.rm = TRUE), .groups = "drop") %>%
+        filter(!!sym("year") == max_year) %>%
+        group_by(!!sym("partner_iso")) %>%
+        summarise(trade_value = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
         # Join with countries table to get country names and continent info
         inner_join(countries_data, by = c("partner_iso" = "country_iso"))
 
       # Create continent colors dataset
       d2 <- d %>%
-        select(continent_name, country_color = continent_color) %>%
+        select(!!sym("continent_name"), country_color = !!sym("continent_color")) %>%
         distinct() %>%
-        arrange(continent_name)
+        arrange(!!sym("continent_name"))
 
       od_treemap(d, d2)
     }) %>%
@@ -548,26 +553,26 @@ mod_products_server <- function(id) {
 
       # Get countries reference data
       countries_data <- tbl(con, "countries") %>%
-        select(country_iso, country_name) %>%
+        select(!!sym("country_iso"), !!sym("country_name")) %>%
         collect()
 
       # Use import flow (trade_value_usd_imp) and reporter_iso to identify importers (more reliable)
       d <- df_dtl() %>%
-        filter(year == min_year) %>%
+        filter(!!sym("year") == min_year) %>%
         inner_join(countries_data, by = c("reporter_iso" = "country_iso")) %>%
-        group_by(country_name) %>%
-        summarise(trade_value_usd_imp = sum(trade_value_usd_imp, na.rm = TRUE), .groups = "drop") %>%
-        filter(trade_value_usd_imp > 0) %>%
+        group_by(!!sym("country_name")) %>%
+        summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+        filter(!!sym("trade_value_usd_imp") > 0) %>%
         mutate(country_name = fct_lump_n(
-          f = country_name,
+          f = !!sym("country_name"),
           n = 4,
-          w = trade_value_usd_imp,
+          w = !!sym("trade_value_usd_imp"),
           other_level = "Rest of the world"
         )) %>%
-        group_by(country_name) %>%
-        summarise(trade_value_usd_imp = sum(trade_value_usd_imp, na.rm = TRUE), .groups = "drop") %>%
-        mutate(country_name = factor(country_name,
-          levels = c(setdiff(unique(country_name), "Rest of the world"), "Rest of the world")
+        group_by(!!sym("country_name")) %>%
+        summarise(trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
+        mutate(country_name = factor(!!sym("country_name"),
+          levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
         ))
 
       d <- d %>% mutate(color = "#518498")
@@ -598,32 +603,32 @@ mod_products_server <- function(id) {
 
       # Get countries reference data
       countries_data <- tbl(con, "countries") %>%
-        select(country_iso, country_name) %>%
+        select(!!sym("country_iso"), !!sym("country_name")) %>%
         collect()
 
       d <- df_dtl() %>%
-        filter(year == max_year) %>%
+        filter(!!sym("year") == max_year) %>%
         inner_join(countries_data, by = c("reporter_iso" = "country_iso")) %>%
-        group_by(country_name) %>%
+        group_by(!!sym("country_name")) %>%
         summarise(
-          trade_value_usd_imp = sum(trade_value_usd_imp, na.rm = TRUE),
+          trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
           .groups = "drop"
         ) %>%
-        filter(trade_value_usd_imp > 0) %>%
+        filter(!!sym("trade_value_usd_imp") > 0) %>%
         mutate(country_name = fct_lump_n(
-          f = country_name,
+          f = !!sym("country_name"),
           n = 4,
-          w = trade_value_usd_imp,
+          w = !!sym("trade_value_usd_imp"),
           other_level = "Rest of the world"
         )) %>%
-        group_by(country_name) %>%
+        group_by(!!sym("country_name")) %>%
         summarise(
-          trade_value_usd_imp = sum(trade_value_usd_imp, na.rm = TRUE),
+          trade_value_usd_imp = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
           .groups = "drop"
         ) %>%
         mutate(
-          country_name = factor(country_name,
-            levels = c(setdiff(unique(country_name), "Rest of the world"), "Rest of the world")
+          country_name = factor(!!sym("country_name"),
+            levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
           )
         )
 
@@ -659,23 +664,23 @@ mod_products_server <- function(id) {
 
       # Get countries reference data
       countries_data <- tbl(con, "countries") %>%
-        select(country_iso, country_name, continent_name, continent_color) %>%
+        select(!!sym("country_iso"), !!sym("country_name"), !!sym("continent_name"), !!sym("continent_color")) %>%
         collect()
 
       # Aggregate by countries instead of products for country treemap
       # Use import flow (trade_value_usd_imp) and reporter_iso to identify importers (more reliable)
       d <- df_dtl() %>%
-        filter(year == min_year) %>%
-        group_by(reporter_iso) %>%
-        summarise(trade_value = sum(trade_value_usd_imp, na.rm = TRUE), .groups = "drop") %>%
+        filter(!!sym("year") == min_year) %>%
+        group_by(!!sym("reporter_iso")) %>%
+        summarise(trade_value = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE), .groups = "drop") %>%
         # Join with countries table to get country names and continent info
         inner_join(countries_data, by = c("reporter_iso" = "country_iso"))
 
       # Create continent colors dataset
       d2 <- d %>%
-        select(continent_name, country_color = continent_color) %>%
+        select(!!sym("continent_name"), country_color = !!sym("continent_color")) %>%
         distinct() %>%
-        arrange(continent_name)
+        arrange(!!sym("continent_name"))
 
       od_treemap(d, d2)
     }) %>%
@@ -692,16 +697,16 @@ mod_products_server <- function(id) {
 
       # Get countries reference data
       countries_data <- tbl(con, "countries") %>%
-        select(country_iso, country_name, continent_name, continent_color) %>%
+        select(!!sym("country_iso"), !!sym("country_name"), !!sym("continent_name"), !!sym("continent_color")) %>%
         collect()
 
       # Aggregate by countries instead of products for country treemap
       # Use import flow (trade_value_usd_imp) and reporter_iso to identify importers (more reliable)
       d <- df_dtl() %>%
-        filter(year == max_year) %>%
-        group_by(reporter_iso) %>%
+        filter(!!sym("year") == max_year) %>%
+        group_by(!!sym("reporter_iso")) %>%
         summarise(
-          trade_value = sum(trade_value_usd_imp, na.rm = TRUE),
+          trade_value = sum(!!sym("trade_value_usd_imp"), na.rm = TRUE),
           .groups = "drop"
         ) %>%
         # Join with countries table to get country names and continent info
@@ -709,9 +714,9 @@ mod_products_server <- function(id) {
 
       # Create continent colors dataset
       d2 <- d %>%
-        select(continent_name, country_color = continent_color) %>%
+        select(!!sym("continent_name"), country_color = !!sym("continent_color")) %>%
         distinct() %>%
-        arrange(continent_name)
+        arrange(!!sym("continent_name"))
 
       out <- od_treemap(d, d2)
 

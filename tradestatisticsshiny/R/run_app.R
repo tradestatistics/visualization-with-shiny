@@ -1,9 +1,7 @@
-#' Run the Shiny Application
-#'
+#' @title Run the Shiny Application
 #' @param ... arguments to pass to golem_opts.
-#' See `?golem::get_golem_options` for more details.
+#'  See `?golem::get_golem_options` for more details.
 #' @inheritParams shiny::shinyApp
-#'
 #' @export
 run_app <- function(
     onStart = NULL,

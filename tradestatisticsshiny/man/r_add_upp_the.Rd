@@ -14,5 +14,5 @@ Character string: "The" for names requiring the article, empty string otherwise
 }
 \description{
 Grammar helper function that adds "The" (capitalized) for reporter names that
-typically take the definite article, used at the beginning of sentences.
+ typically take the definite article, used at the beginning of sentences.
 }

@@ -1,5 +1,6 @@
-#' @title countries-server
-#' @noRd
+#' @title Country profile server-side function
+#' @description A shiny Module.
+#' @param id Internal parameter for Shiny.
 mod_countries_server <- function(id) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
@@ -55,19 +56,11 @@ mod_countries_server <- function(id) {
       out
     })
 
-    # Ensure data frame contains expected columns to avoid mutate/group_by errors
-    ensure_cols <- function(df, cols) {
-      for (c in cols) {
-        if (!c %in% names(df)) df[[c]] <- NA_character_
-      }
-      df
-    }
-
     title <- eventReactive(input$go, {
       if (inp_p() == "ALL") {
-        glue("{ r_add_upp_the(rname()) } { rname() } multilateral trade between { min(inp_y()) } and { max(inp_y()) }")
+        glue("{ r_add_upp_the(rname()) } { rname() }: Multilateral trade { min(inp_y()) } - { max(inp_y()) }")
       } else {
-        glue("{ r_add_upp_the(rname()) } { rname() } and { r_add_the(pname()) } { pname() } trade between { min(inp_y()) } and { max(inp_y()) }")
+        glue("{ r_add_upp_the(rname()) } { rname() } and { r_add_the(pname()) } { pname() }: Bilateral trade { min(inp_y()) } - { max(inp_y()) }")
       }
     })
 
@@ -896,9 +889,9 @@ mod_countries_server <- function(id) {
 
     trd_exc_columns_title <- eventReactive(input$go, {
       if (inp_p() == "ALL") {
-        glue("{ r_add_upp_the(rname()) } { rname() } multilateral trade between { min(inp_y()) } and { max(inp_y()) }")
+        glue("{ r_add_upp_the(rname()) } { rname() }: Imports and Exports { min(inp_y()) } - { max(inp_y()) }")
       } else {
-        glue("{ r_add_upp_the(rname()) } { rname() } and { r_add_the(pname()) } { pname() } exchange between { min(inp_y()) } and { max(inp_y()) }")
+        glue("{ r_add_upp_the(rname()) } { rname() } and { r_add_the(pname()) } { pname() }: Bilateral trade { min(inp_y()) } - { max(inp_y()) }")
       }
     })
 
@@ -969,11 +962,11 @@ mod_countries_server <- function(id) {
 
     # Export column chart titles
     exp_col_min_yr_usd_tt <- eventReactive(input$go, {
-      glue("Exports in { min(inp_y()) } (USD Billion)")
+      glue("Exports in { min(inp_y()) }")
     })
 
     exp_col_max_yr_usd_tt <- eventReactive(input$go, {
-      glue("Exports in { max(inp_y()) } (USD Billion)")
+      glue("Exports in { max(inp_y()) }")
     })
 
     # Export column charts
@@ -1115,7 +1108,11 @@ mod_countries_server <- function(id) {
             sort = "asc-y"
           )
         ) %>%
-        po_labels(title = exp_col_min_yr_usd_tt(), x = NULL, y = "Trade Value (USD Billion)") %>%
+        po_labels(
+          title = exp_col_min_yr_usd_tt(),
+          y = "Country",
+          x = "Trade Value (USD Billion)"
+        ) %>%
         po_format(x = format(.data$trade_value_usd_exp, big.mark = " ", scientific = FALSE)) %>%
         po_tooltip("{country_name}: {trade_value_usd_exp} B") %>%
         po_background("transparent")
@@ -1261,7 +1258,7 @@ mod_countries_server <- function(id) {
             sort = "asc-y"
           )
         ) %>%
-        po_labels(title = exp_col_max_yr_usd_tt(), x = NULL, y = "Trade Value (USD Billion)") %>%
+        po_labels(title = exp_col_max_yr_usd_tt(), y = "Country", x = "Trade Value (USD Billion)") %>%
         po_format(x = format(.data$trade_value_usd_exp, big.mark = " ", scientific = FALSE)) %>%
         po_tooltip("{country_name}: {trade_value_usd_exp} B") %>%
         po_background("transparent")
@@ -1465,7 +1462,7 @@ mod_countries_server <- function(id) {
             sort = "asc-y"
           )
         ) %>%
-        po_labels(title = imp_col_min_yr_usd_tt(), x = NULL, y = "Trade Value (USD Billion)") %>%
+        po_labels(title = imp_col_min_yr_usd_tt(), y = "Country", x = "Trade Value (USD Billion)") %>%
         po_format(x = format(.data$trade_value_usd_imp, big.mark = " ", scientific = FALSE)) %>%
         po_tooltip("{country_name}: {trade_value_usd_imp} B") %>%
         po_background("transparent")
@@ -1611,7 +1608,7 @@ mod_countries_server <- function(id) {
             sort = "asc-y"
           )
         ) %>%
-        po_labels(title = imp_col_max_yr_usd_tt(), x = NULL, y = "Trade Value (USD Billion)") %>%
+        po_labels(title = imp_col_max_yr_usd_tt(), y = "Country", x = "Trade Value (USD Billion)") %>%
         po_format(x = format(.data$trade_value_usd_imp, big.mark = " ", scientific = FALSE)) %>%
         po_tooltip("{country_name}: {trade_value_usd_imp} B") %>%
         po_background("transparent")
@@ -1813,7 +1810,7 @@ mod_countries_server <- function(id) {
         show(id = "aggregated_trade")
         show(id = "detailed_trade_exp")
         show(id = "detailed_trade_imp")
-        show(id = "downloads_data")
+        show(id = "download_data")
       }
     })
   })
