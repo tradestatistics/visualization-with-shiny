@@ -310,11 +310,16 @@ mod_products_server <- function(id) {
           color = ifelse(!!sym("flow") == "Exports", "#67c090", "#26667f")
         )
 
+      # convert to billions for display
+      d <- d %>%
+        arrange(!!sym("year")) %>%
+        mutate(trade_billion = .data$trade / 1e9)
+
       d3po(d) %>%
         po_bar(
           daes(
             x = .data$year,
-            y = .data$trade,
+            y = .data$trade_billion,
             group = .data$flow,
             color = .data$color,
             stack = FALSE
@@ -322,19 +327,19 @@ mod_products_server <- function(id) {
         ) %>%
         po_labels(
           x = "Year",
-          y = "Trade Value (USD)",
+          y = "Trade Value (USD billion)",
           title = trd_exc_columns_title()
         ) %>%
         po_format(
-          y = format(.data$trade, big.mark = " ", scientific = FALSE)
+          y = format(.data$trade_billion, big.mark = " ", scientific = FALSE, digits = 2)
         ) %>%
         po_tooltip(JS(
           "function(value, row) {
             if (!row) return '';
             var grp = (row.flow != null) ? row.flow : (row.group != null ? row.group : '');
-            var val = (value != null && !isNaN(value)) ? Number(value) : (row.trade != null && !isNaN(row.trade) ? Number(row.trade) : 0);
+            var val = (value != null && !isNaN(value)) ? Number(value) : (row.trade_billion != null && !isNaN(row.trade_billion) ? Number(row.trade_billion) : 0);
             var groupPrefix = grp ? (grp + ': ') : '';
-            return groupPrefix + (val || 0);
+            return groupPrefix + (val || 0) + ' billion';
           }"
         )) %>%
         po_background("transparent")
@@ -352,11 +357,11 @@ mod_products_server <- function(id) {
 
     # Export column chart titles
     exp_col_min_yr_usd_tt <- eventReactive(input$go, {
-      glue("Exports in { min(inp_y()) } (USD)")
+      glue("Exports in { min(inp_y()) }")
     })
 
     exp_col_max_yr_usd_tt <- eventReactive(input$go, {
-      glue("Exports in { max(inp_y()) } (USD)")
+      glue("Exports in { max(inp_y()) }")
     })
 
     # Export column charts
@@ -388,7 +393,28 @@ mod_products_server <- function(id) {
           levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
         ))
 
+      # Convert values to billions for display and number top 4 + Rest of the world as 5
+      d <- d %>%
+        arrange(desc(!!sym("trade_value_usd_imp"))) %>%
+        mutate(rank = row_number())
+
       d <- d %>% mutate(color = "#85cca6")
+
+      # Ensure Rest of the world is always present and set to position 5
+      d <- d %>%
+        filter(!!sym("country_name") == "Rest of the world") %>%
+        mutate(n = 5L) %>%
+        bind_rows(
+          d %>%
+            filter(!!sym("country_name") != "Rest of the world") %>%
+            arrange(desc(!!sym("trade_value_usd_imp"))) %>%
+            mutate(n = row_number())
+        ) %>%
+        mutate(
+          country_name = paste(!!sym("n"), !!sym("country_name"), sep = " - "),
+          trade_value_usd_imp = round(!!sym("trade_value_usd_imp") / 1e9, 2)
+        ) %>%
+        select(-!!sym("n"))
 
       d3po(d) %>%
         po_bar(
@@ -402,17 +428,16 @@ mod_products_server <- function(id) {
         po_labels(
           title = exp_col_min_yr_usd_tt(),
           y = "Country",
-          x = "Trade Value (USD)"
+          x = "Trade Value (USD billion)"
         ) %>%
-        po_format(x = format(.data$trade_value_usd_imp, big.mark = " ", scientific = FALSE)) %>%
-        po_tooltip("{country_name}: {trade_value_usd_imp}") %>%
+        po_format(x = format(.data$trade_value_usd_imp, big.mark = " ", scientific = FALSE, digits = 2)) %>%
+        po_tooltip("{country_name}: {trade_value_usd_imp} billion") %>%
         po_background("transparent")
     }) %>%
       bindCache(inp_y(), inp_s(), inp_d()) %>%
       bindEvent(input$go)
 
     exp_col_max_yr_usd <- reactive({
-      # Evaluate year locally to avoid reactive closure issues
       max_year <- max(inp_y())
 
       # Get countries reference data
@@ -441,30 +466,51 @@ mod_products_server <- function(id) {
           levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
         ))
 
+      d <- d %>%
+        arrange(desc(!!sym("trade_value_usd_imp"))) %>%
+        mutate(rank = row_number())
+
       d <- d %>% mutate(color = "#67c090")
+
+      # Ensure Rest of the world is always present and set to position 5
+      d <- d %>%
+        filter(!!sym("country_name") == "Rest of the world") %>%
+        mutate(n = 5L) %>%
+        bind_rows(
+          d %>%
+            filter(!!sym("country_name") != "Rest of the world") %>%
+            arrange(desc(!!sym("trade_value_usd_imp"))) %>%
+            mutate(n = row_number())
+        ) %>%
+        mutate(
+          country_name = paste(!!sym("n"), !!sym("country_name"), sep = " - "),
+          trade_value_usd_imp = round(!!sym("trade_value_usd_imp") / 1e9, 2)
+        ) %>%
+        select(-!!sym("n"))
 
       d3po(d) %>%
         po_bar(
           daes(
             y = .data$country_name,
             x = .data$trade_value_usd_imp,
-            color = .data$color
+            color = .data$color,
+            sort = "asc-y"
           )
         ) %>%
         po_labels(
           title = exp_col_max_yr_usd_tt(),
           y = "Country",
-          x = "Trade Value (USD)"
+          x = "Trade Value (USD billion)"
         ) %>%
-        po_format(x = format(.data$trade_value_usd_imp, big.mark = " ", scientific = FALSE)) %>%
-        po_tooltip("{country_name}: {trade_value_usd_imp}") %>%
+        po_format(x = format(.data$trade_value_usd_imp, big.mark = " ", scientific = FALSE, digits = 2)) %>%
+        po_tooltip("{country_name}: {trade_value_usd_imp} billion") %>%
         po_background("transparent")
     }) %>%
       bindCache(inp_y(), inp_s(), inp_d()) %>%
       bindEvent(input$go)
 
     exp_tt_min_yr <- eventReactive(input$go, {
-      glue("Exports in { min(inp_y()) } by country")
+      glue("Exports in { min(inp_y()) }")
     })
 
     exp_tm_dtl_min_yr <- reactive({
@@ -491,13 +537,13 @@ mod_products_server <- function(id) {
         distinct() %>%
         arrange(!!sym("continent_name"))
 
-      od_treemap(d, d2)
+      od_treemap(d, d2, title = exp_tt_min_yr())
     }) %>%
       bindCache(inp_y(), inp_s(), inp_d()) %>%
       bindEvent(input$go)
 
     exp_tt_max_yr <- eventReactive(input$go, {
-      glue("Exports in { max(inp_y()) } by country")
+      glue("Exports in { max(inp_y()) }")
     })
 
     exp_tm_dtl_max_yr <- reactive({
@@ -524,7 +570,7 @@ mod_products_server <- function(id) {
         distinct() %>%
         arrange(!!sym("continent_name"))
 
-      od_treemap(d, d2)
+      od_treemap(d, d2, title = exp_tt_max_yr())
     }) %>%
       bindCache(inp_y(), inp_s(), inp_d()) %>%
       bindEvent(input$go)
@@ -539,11 +585,11 @@ mod_products_server <- function(id) {
 
     # Import column chart titles
     imp_col_min_yr_usd_tt <- eventReactive(input$go, {
-      glue("Imports in { min(inp_y()) } (USD)")
+      glue("Imports in { min(inp_y()) }")
     })
 
     imp_col_max_yr_usd_tt <- eventReactive(input$go, {
-      glue("Imports in { max(inp_y()) } (USD)")
+      glue("Imports in { max(inp_y()) }")
     })
 
     # Import column charts
@@ -575,23 +621,44 @@ mod_products_server <- function(id) {
           levels = c(setdiff(unique(!!sym("country_name")), "Rest of the world"), "Rest of the world")
         ))
 
+      d <- d %>%
+        arrange(desc(!!sym("trade_value_usd_imp"))) %>%
+        mutate(rank = row_number())
+
       d <- d %>% mutate(color = "#518498")
+
+      # Ensure Rest of the world is always present and set to position 5
+      d <- d %>%
+        filter(!!sym("country_name") == "Rest of the world") %>%
+        mutate(n = 5L) %>%
+        bind_rows(
+          d %>%
+            filter(!!sym("country_name") != "Rest of the world") %>%
+            arrange(desc(!!sym("trade_value_usd_imp"))) %>%
+            mutate(n = row_number())
+        ) %>%
+        mutate(
+          country_name = paste(!!sym("n"), !!sym("country_name"), sep = " - "),
+          trade_value_usd_imp = round(!!sym("trade_value_usd_imp") / 1e9, 2)
+        ) %>%
+        select(-!!sym("n"))
 
       d3po(d) %>%
         po_bar(
           daes(
             y = .data$country_name,
             x = .data$trade_value_usd_imp,
-            color = .data$color
+            color = .data$color,
+            sort = "asc-y"
           )
         ) %>%
         po_labels(
           title = imp_col_min_yr_usd_tt(),
           y = "Country",
-          x = "Trade Value (USD)"
+          x = "Trade Value (USD billion)"
         ) %>%
-        po_format(x = format(.data$trade_value_usd_imp, big.mark = " ", scientific = FALSE)) %>%
-        po_tooltip("{country_name}: {trade_value_usd_imp}") %>%
+        po_format(x = format(.data$trade_value_usd_imp, big.mark = " ", scientific = FALSE, digits = 2)) %>%
+        po_tooltip("{country_name}: {trade_value_usd_imp} billion") %>%
         po_background("transparent")
     }) %>%
       bindCache(inp_y(), inp_s(), inp_d()) %>%
@@ -632,30 +699,51 @@ mod_products_server <- function(id) {
           )
         )
 
+      d <- d %>%
+        arrange(desc(!!sym("trade_value_usd_imp"))) %>%
+        mutate(rank = row_number())
+
       d <- d %>% mutate(color = "#26667f")
+
+      # Ensure Rest of the world is always present and set to position 5
+      d <- d %>%
+        filter(!!sym("country_name") == "Rest of the world") %>%
+        mutate(n = 5L) %>%
+        bind_rows(
+          d %>%
+            filter(!!sym("country_name") != "Rest of the world") %>%
+            arrange(desc(!!sym("trade_value_usd_imp"))) %>%
+            mutate(n = row_number())
+        ) %>%
+        mutate(
+          country_name = paste(!!sym("n"), !!sym("country_name"), sep = " - "),
+          trade_value_billion = round(!!sym("trade_value_usd_imp") / 1e9, 2)
+        ) %>%
+        select(-!!sym("n"))
 
       d3po(d) %>%
         po_bar(
           daes(
             y = .data$country_name,
-            x = .data$trade_value_usd_imp,
-            color = .data$color
+            x = .data$trade_value_billion,
+            color = .data$color,
+            sort = "asc-y"
           )
         ) %>%
         po_labels(
           title = imp_col_max_yr_usd_tt(),
           y = "Country",
-          x = "Trade Value (USD)"
+          x = "Trade Value (USD billion)"
         ) %>%
-        po_format(x = format(.data$trade_value_usd_imp, big.mark = " ", scientific = FALSE)) %>%
-        po_tooltip("{country_name}: {trade_value_usd_imp}") %>%
+        po_format(x = format(.data$trade_value_billion, big.mark = " ", scientific = FALSE, digits = 2)) %>%
+        po_tooltip("{country_name}: {trade_value_billion} billion") %>%
         po_background("transparent")
     }) %>%
       bindCache(inp_y(), inp_s(), inp_d()) %>%
       bindEvent(input$go)
 
     imp_tt_min_yr <- eventReactive(input$go, {
-      glue("Imports in { min(inp_y()) } by country")
+      glue("Imports in { min(inp_y()) }")
     })
 
     imp_tm_dtl_min_yr <- reactive({
@@ -682,13 +770,13 @@ mod_products_server <- function(id) {
         distinct() %>%
         arrange(!!sym("continent_name"))
 
-      od_treemap(d, d2)
+      od_treemap(d, d2, title = imp_tt_min_yr())
     }) %>%
       bindCache(inp_y(), inp_s(), inp_d()) %>%
       bindEvent(input$go)
 
     imp_tt_max_yr <- eventReactive(input$go, {
-      glue("Imports in { max(inp_y()) } by country")
+      glue("Imports in { max(inp_y()) }")
     })
 
     imp_tm_dtl_max_yr <- reactive({
@@ -718,7 +806,7 @@ mod_products_server <- function(id) {
         distinct() %>%
         arrange(!!sym("continent_name"))
 
-      out <- od_treemap(d, d2)
+      out <- od_treemap(d, d2, title = imp_tt_max_yr())
 
       w$hide()
 

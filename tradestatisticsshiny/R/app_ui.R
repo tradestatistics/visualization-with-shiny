@@ -12,19 +12,29 @@ app_ui <- function(request) {
     # Your application UI logic using tabler
     tabler_page(
       title = "Open Trade Statistics",
-      layout = "fluid-vertical",
-      navbar = tabler_sidebar(
+
+      # layout = "navbar-sticky",
+      # navbar = topbar(
+      #   title = "Open Trade Statistics",
+      #   menu_item("Welcome", tab_name = "welcome", icon = "home"),
+      #   menu_item("Countries", tab_name = "co", icon = "globe-filled"),
+      #   menu_item("Products", tab_name = "pr", icon = "shopping-cart-filled"),
+      #   menu_item("Cite", tab_name = "cite", icon = "book-filled")
+      # ),
+
+      layout = "vertical",
+      theme = "light",
+      color = "teal",
+      navbar = sidebar_menu(
         title = "Open Trade Statistics",
-        sidebar_menu(
-          useShinyjs(),
-          useWaiter(),
-          menu_item("Welcome", tab_name = "welcome"),
-          menu_item("Countries", tab_name = "co"),
-          menu_item("Products", tab_name = "pr"),
-          menu_item("Cite", tab_name = "cite")
-        )
+        menu_item("Welcome", tab_name = "welcome", icon = "home"),
+        menu_item("Countries", tab_name = "co", icon = "globe-filled"),
+        menu_item("Products", tab_name = "pr", icon = "shopping-cart-filled"),
+        menu_item("Cite", tab_name = "cite", icon = "book-filled")
       ),
       body = tabler_body(
+        useShinyjs(),
+        useWaiter(),
         tabler_tab_items(
           tabler_tab_item(
             tab_name = "welcome",
@@ -62,29 +72,16 @@ golem_add_external_resources <- function() {
     app_sys("app/www")
   )
 
-  # Add JavaScript to add an id to the <section> tag
-  # so we can overlay waiter on top of it
-  add_id_to_section <- "
-  $( document ).ready(function() {
-    var section = document.getElementsByClassName('page-body');
-    section[0].setAttribute('id', 'waiter-content');
-  });"
-
   tags$head(
     favicon(),
     bundle_resources(
       path = app_sys("app/www"),
       app_title = "Open Trade Statistics"
     ),
-    # Include custom JS that equalizes card heights where needed
-    tags$script(src = "www/card-height.js"),
-    tags$script(add_id_to_section),
-    tags$style(
-      ".waiter-overlay-content{
-        position: absolute;
-        top: 45vh;
-        left: 50%;
-      }"
-    )
+
+    # Include custom JS that equalizes card heights where needed and waiter helper
+    tags$script(src = "www/tabler-waiter.js"),
+    tags$link(rel = "stylesheet", type = "text/css", href = "www/tabler.css"),
+    tags$link(rel = "stylesheet", type = "text/css", href = "www/waiter.css")
   )
 }

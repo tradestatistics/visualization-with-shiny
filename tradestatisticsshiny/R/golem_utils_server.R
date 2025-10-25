@@ -39,7 +39,7 @@ ensure_cols <- function(df, cols) {
 #' @title Origin-Destination Treemap
 #' @param d input dataset for values
 #' @param d2 input dataset for colours
-od_treemap <- function(d, d2) {
+od_treemap <- function(d, d2, title = NULL) {
   dd <- d %>%
     mutate(
       continent_name = factor(!!sym("continent_name"),
@@ -86,14 +86,75 @@ od_treemap <- function(d, d2) {
     ) %>%
     po_labels(
       align = "left-top",
-      title = NULL
-      # subtitle = JS(
-      #   "function(_v, row) { if (row && row.mode === 'drilled') return 'Displaying Sub-Group'; return 'Displaying Group'; }"
-      # )
+      title = title,
+      subtitle = JS(
+        "function(_v, row) { if (row && row.mode === 'drilled') return 'Displaying Countries'; return 'Displaying Continents'; }"
+      ),
+      labels = JS(
+        "function(percentage, row) {
+          var pct = (percentage).toFixed(2) + '%';
+
+          function stripZeros(s) {
+            if (s.slice(-3) === '.00') return s.slice(0, -3);
+            if (s.slice(-2) === '.0') return s.slice(0, -2);
+            return s;
+          }
+
+          function formatBillion(v) {
+            var s = (Number(v) / 1e9).toFixed(2);
+            return stripZeros(s) + 'B';
+          }
+
+          var group = (row && (row.group || row.continent_name || row.name)) ? (row.group || row.continent_name || row.name) : '';
+          var subgroup = (row && (row.subgroup || row.country_name)) ? (row.subgroup || row.country_name) : '';
+          var rawValue = row && (row.trade_value != null ? row.trade_value : (row.count != null ? row.count : (row.value != null ? row.value : '')));
+          var value = formatBillion(rawValue);
+
+          if (!row || !subgroup) {
+            return group + '<br/>' + value + '<br/>' + pct;
+          }
+
+          return subgroup + '<br/>' + value + '<br/>' + pct;
+        }"
+      )
     ) %>%
-    # po_tooltip(JS(
-    #   "function(percentage, row) {\n       var pct = (percentage).toFixed(1) + '%';\n\n       // Minimal tooltip: rely on row.trade_value / row.count and explicit row.group / row.subgroup fields\n       var value = row && (row.trade_value != null ? row.trade_value : (row.count != null ? row.count : ''));\n\n       // If there's no subgroup (level-2) show only the group\n       if (!row || !row.subgroup) {\n         var g = row && (row.group || row.name) ? (row.group || row.name) : '';\n         return '<i>' + g + '</i><br/>Value: ' + value + '<br/>Percentage: ' + pct;\n       }\n\n       // When subgroup is present but equals the placeholder 'only', hide the subgroup row in tooltip\n       if (row.subgroup === 'only') {\n         return '<i>' + (row.group || '') + '</i><br/>Value: ' + value + '<br/>Percentage: ' + pct;\n       }\n\n       return '<i>' + (row.group || '') + ' — ' + (row.subgroup || '') + '</i><br/>Value: ' + value + '<br/>Percentage: ' + pct;\n     }"
-    # )) %>%
+    po_tooltip(JS(
+      "function(percentage, row) {
+        var pct = (percentage).toFixed(2) + '%';
+
+        var forceBillions = true;
+        function formatNumber(v) {
+          if (v === null || v === undefined || v === '') return '';
+          var n = Number(v);
+          if (isNaN(n)) return String(v);
+          var abs = Math.abs(n);
+          function stripZeros(s) {
+            if (s.slice(-3) === '.00') return s.slice(0, -3);
+            if (s.slice(-2) === '.0') return s.slice(0, -2);
+            return s;
+          }
+          if (forceBillions) {
+            var s = (n / 1e9).toFixed(2);
+            return stripZeros(s) + 'B';
+          }
+          if (abs >= 1e9) { var s = (n / 1e9).toFixed(2); return stripZeros(s) + 'B'; }
+          if (abs >= 1e6) { var s = (n / 1e6).toFixed(2); return stripZeros(s) + 'M'; }
+          if (abs >= 1e3) { var s = (n / 1e3).toFixed(1); return stripZeros(s) + 'k'; }
+          return n.toLocaleString(undefined, {maximumFractionDigits: 2});
+        }
+
+        var group = (row && (row.group || row.continent_name || row.name)) ? (row.group || row.continent_name || row.name) : '';
+        var subgroup = (row && (row.subgroup || row.country_name)) ? (row.subgroup || row.country_name) : '';
+        var raw = row && (row.trade_value != null ? row.trade_value : (row.count != null ? row.count : (row.value != null ? row.value : '')));
+        var value = formatNumber(raw);
+
+        if (!row || !subgroup) {
+          return '<b>' + group + '</b><br/>Value: ' + value + '<br/>Percentage: ' + pct;
+        }
+
+        return '<b>' + subgroup + '</b><br/>Value: ' + value + '<br/>Percentage: ' + pct;
+      }"
+    )) %>%
     po_background("transparent")
 }
 

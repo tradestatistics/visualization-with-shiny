@@ -8,29 +8,54 @@ mod_cite_ui <- function(id) {
     tags$head(
       tags$meta(name = "citation_title", content = "Open Trade Statistics"),
       tags$link(rel = "canonical", href = "https://shiny.tradestatistics.io"),
-      tags$meta(name = "citation_author", content = "Vargas Sepulveda, Mauricio"),
+      tags$meta(
+        name = "citation_author",
+        content = "Vargas Sepulveda, Mauricio"
+      ),
       tags$meta(name = "citation_publication_date", content = Sys.Date()),
       tags$meta(name = "citation_doi", content = "10.5281/zenodo.3738793"),
       tags$meta(name = "citation_publisher", content = "Open Trade Statistics"),
-      tags$meta(name = "citation_abstract", content = "Interactive dashboard presenting UN Comtrade Plus based trade statistics."),
-      tags$script(type = "application/ld+json", HTML(
-        toJSON(list(
-          "@context" = "http://schema.org",
-          "@type" = "SoftwareApplication",
-          name = "Open Trade Statistics Beta Dashboard",
-          url = "https://shiny.tradestatistics.io",
-          author = list("@type" = "Person", name = "Vargas Sepulveda, Mauricio"),
-          publisher = list("@type" = "Organization", name = "Open Trade Statistics"),
-          identifier = list("@type" = "PropertyValue", propertyID = "DOI", value = "10.5281/zenodo.3738793")
-        ), auto_unbox = TRUE, pretty = TRUE)
-      ))
+      tags$meta(
+        name = "citation_abstract",
+        content = "Interactive dashboard presenting UN Comtrade Plus based trade statistics."
+      ),
+      tags$script(
+        type = "application/ld+json",
+        HTML(
+          toJSON(
+            list(
+              "@context" = "http://schema.org",
+              "@type" = "SoftwareApplication",
+              name = "Open Trade Statistics Dashboard",
+              url = "https://shiny.tradestatistics.io",
+              author = list(
+                "@type" = "Person",
+                name = "Vargas Sepulveda, Mauricio"
+              ),
+              publisher = list(
+                "@type" = "Organization",
+                name = "Open Trade Statistics"
+              ),
+              identifier = list(
+                "@type" = "PropertyValue",
+                propertyID = "DOI",
+                value = "10.5281/zenodo.3738793"
+              )
+            ),
+            auto_unbox = TRUE,
+            pretty = TRUE
+          )
+        )
+      )
     ),
     fluidRow(
       col_12(
-        h2("Cite"),
-        uiOutput(ns("citation_text")),
-        uiOutput(ns("citation_bibtex")),
-        tags$hr()
+        tabler_card(
+          h2("Cite"),
+          uiOutput(ns("citation_text")),
+          br(),
+          uiOutput(ns("citation_bibtex"))
+        )
       )
     )
   )

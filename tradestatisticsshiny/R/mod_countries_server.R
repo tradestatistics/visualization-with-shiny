@@ -927,7 +927,7 @@ mod_countries_server <- function(id) {
         ) %>%
         po_labels(
           x = "Year",
-          y = "Trade Value (USD Billion)",
+          y = "Trade Value (USD billion)",
           title = trd_exc_columns_title()
         ) %>%
         po_format(
@@ -1316,11 +1316,11 @@ mod_countries_server <- function(id) {
 
     # Import column chart titles
     imp_col_min_yr_usd_tt <- eventReactive(input$go, {
-      glue("Imports in { min(inp_y()) } (USD Billion)")
+      glue("Imports in { min(inp_y()) }")
     })
 
     imp_col_max_yr_usd_tt <- eventReactive(input$go, {
-      glue("Imports in { max(inp_y()) } (USD Billion)")
+      glue("Imports in { max(inp_y()) }")
     })
 
     # Import column charts
