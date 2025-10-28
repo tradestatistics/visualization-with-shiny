@@ -50,7 +50,7 @@ mod_cite_ui <- function(id) {
     ),
     fluidRow(
       col_12(
-        tabler_card(
+        card(
           h2("Cite"),
           uiOutput(ns("citation_text")),
           br(),

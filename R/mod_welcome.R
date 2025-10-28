@@ -7,7 +7,7 @@ mod_welcome_ui <- function(id) {
     div(
       fluidRow(
         col_12(
-          tabler_card(
+          card(
             h1("Open Trade Statistics"),
             br(),
             br(),

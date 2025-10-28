@@ -8,53 +8,50 @@ app_ui <- function(request) {
   tagList(
     # External resources
     golem_add_external_resources(),
-
-    # Your application UI logic using tabler
-    tabler_page(
+    page(
       title = "Open Trade Statistics",
-
-      # layout = "navbar-sticky",
-      # navbar = topbar(
-      #   title = "Open Trade Statistics",
-      #   menu_item("Welcome", tab_name = "welcome", icon = "home"),
-      #   menu_item("Countries", tab_name = "co", icon = "globe-filled"),
-      #   menu_item("Products", tab_name = "pr", icon = "shopping-cart-filled"),
-      #   menu_item("Cite", tab_name = "cite", icon = "book-filled")
-      # ),
-
-      layout = "vertical",
+      # layout = "fluid-vertical",
+      layout = "navbar-sticky-dark",
       theme = "light",
       color = "teal",
-      navbar = sidebar_menu(
-        title = "Open Trade Statistics",
+      show_theme_button = FALSE,
+      navbar = navbar_menu(
+        brand = sidebar_brand(text = "Open Trade Statistics", href = "./"),
         menu_item("Welcome", tab_name = "welcome", icon = "home"),
         menu_item("Countries", tab_name = "co", icon = "globe-filled"),
         menu_item("Products", tab_name = "pr", icon = "shopping-cart-filled"),
         menu_item("Cite", tab_name = "cite", icon = "book-filled")
       ),
-      body = tabler_body(
-        useShinyjs(),
-        useWaiter(),
-        tabler_tab_items(
-          tabler_tab_item(
-            tab_name = "welcome",
-            mod_welcome_ui("welcome")
-          ),
-          tabler_tab_item(
-            tab_name = "co",
-            mod_countries_ui("co")
-          ),
-          tabler_tab_item(
-            tab_name = "pr",
-            mod_products_ui("pr")
-          ),
-          tabler_tab_item(
-            tab_name = "cite",
-            mod_cite_ui("cite")
+      body = list(
+        # page_header(
+        #   title_text = "Open Trade Statistics",
+        #   pretitle_text = "Overview"
+        # ),
+        body(
+          useShinyjs(),
+          useWaiter(),
+          br(),
+          tab_items(
+            tab_item(
+              tab_name = "welcome",
+              mod_welcome_ui("welcome")
+            ),
+            tab_item(
+              tab_name = "co",
+              mod_countries_ui("co")
+            ),
+            tab_item(
+              tab_name = "pr",
+              mod_products_ui("pr")
+            ),
+            tab_item(
+              tab_name = "cite",
+              mod_cite_ui("cite")
+            )
           )
-        )
-      ),
-      footer = tabler_footer(left = "Made by Mauricio 'Pacha' Vargas Sepulveda", right = paste("Open Trade Statistics", get_year()))
+        ),
+        footer = footer(left = "Made by Mauricio 'Pacha' Vargas Sepulveda", right = paste("Open Trade Statistics", get_year()))
+      )
     ),
     tags$footer(
       tags$link(rel = "shortcut icon", href = "img/favicon.ico")

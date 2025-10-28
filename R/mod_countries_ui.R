@@ -8,7 +8,7 @@ mod_countries_ui <- function(id) {
     div(
       # Filter -----
       fluidRow(
-        tabler_card(
+        card(
           col_12(
             h2("Filter"),
             fluidRow(
@@ -98,7 +98,7 @@ mod_countries_ui <- function(id) {
           br(),
           br(),
           fluidRow(
-            tabler_card(
+            card(
               col_12(
                 htmlOutput(ns("title"), container = tags$h1)
               )
@@ -115,7 +115,7 @@ mod_countries_ui <- function(id) {
           br(),
           br(),
           fluidRow(
-            tabler_card(
+            card(
               htmlOutput(ns("trd_stl"), container = tags$h2),
               fluidRow(
                 col_6(
@@ -145,7 +145,7 @@ mod_countries_ui <- function(id) {
           br(),
           br(),
           fluidRow(
-            tabler_card(
+            card(
               htmlOutput(ns("exp_tt_yr"), container = tags$h2),
               fluidRow(
                 col_6(
@@ -174,7 +174,7 @@ mod_countries_ui <- function(id) {
           br(),
           br(),
           fluidRow(
-            tabler_card(
+            card(
               htmlOutput(ns("imp_tt_yr"), container = tags$h2),
               fluidRow(
                 col_6(
@@ -202,7 +202,7 @@ mod_countries_ui <- function(id) {
           br(),
           br(),
           fluidRow(
-            tabler_card(
+            card(
               htmlOutput(ns("dwn_stl"), container = tags$h2),
               htmlOutput(ns("dwn_txt"), container = tags$p),
               uiOutput(ns("dwn_fmt")),

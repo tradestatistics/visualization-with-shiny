@@ -4,7 +4,7 @@
 \alias{od_treemap}
 \title{Origin-Destination Treemap}
 \usage{
-od_treemap(d, d2)
+od_treemap(d, d2, title = NULL)
 }
 \arguments{
 \item{d}{input dataset for values}
