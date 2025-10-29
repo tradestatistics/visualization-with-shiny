@@ -25,7 +25,7 @@ mod_products_ui <- function(id) {
                   width = "100%"
                 )
               ),
-              col_3(
+              col_6(
                 selectInput(
                   ns("s"),
                   "Section / Commodity",
