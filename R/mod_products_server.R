@@ -15,8 +15,6 @@ mod_products_server <- function(id) {
     })
 
     # User inputs ----
-    observe_helpers()
-
     inp_y <- reactive({
       y <- c(min(input$y[1], input$y[2]), max(input$y[1], input$y[2]))
       return(y)

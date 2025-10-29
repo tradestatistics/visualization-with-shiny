@@ -29,7 +29,6 @@ Imports:
     rlang (>= 1.0.2),
     RPostgres,
     shiny (>= 1.7.1),
-    shinyhelper (>= 0.3.2),
     shinyjs (>= 2.1.0),
     stats,
     tabler,

@@ -39,6 +39,7 @@ ensure_cols <- function(df, cols) {
 #' @title Origin-Destination Treemap
 #' @param d input dataset for values
 #' @param d2 input dataset for colours
+#' @param title title for the treemap
 od_treemap <- function(d, d2, title = NULL) {
   dd <- d %>%
     mutate(

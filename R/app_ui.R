@@ -1,9 +1,5 @@
 #' @title The application User-Interface
 #' @param request Internal parameter for `Shiny`. DO NOT REMOVE.
-#' @import shiny
-#' @import tabler
-#' @import d3po
-#' @noRd
 app_ui <- function(request) {
   tagList(
     # External resources
@@ -62,7 +58,6 @@ app_ui <- function(request) {
 #' @title Add external Resources to the Application
 #' @description This function is internally used to add external
 #'  resources inside the Shiny application.
-#' @import shiny
 golem_add_external_resources <- function() {
   add_resource_path(
     "www",

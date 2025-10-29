@@ -60,19 +60,7 @@ mod_countries_ui <- function(id) {
                   selected = "",
                   selectize = TRUE,
                   width = "100%"
-                ) %>%
-                  helper(
-                    type = "inline",
-                    title = "Convert to dollars of the year",
-                    content = c(
-                      "Uses present value and/or future value equations to adjust money value
-                      by yearly changes in GDP deflator. The source for the GDP deflator data is The World Bank."
-                    ),
-                    buttonLabel = "Got it!",
-                    easyClose = FALSE,
-                    fade = TRUE,
-                    size = "s"
-                  )
+                )
               )
             ),
             fluidRow(

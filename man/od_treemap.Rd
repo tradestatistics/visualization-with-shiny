@@ -10,6 +10,8 @@ od_treemap(d, d2, title = NULL)
 \item{d}{input dataset for values}
 
 \item{d2}{input dataset for colours}
+
+\item{title}{title for the treemap}
 }
 \description{
 Origin-Destination Treemap

@@ -1,4 +1,7 @@
 #' @keywords internal
+#' @import shiny
+#' @import tabler
+#' @import d3po
 #' @importFrom cachem cache_disk
 #' @importFrom shiny shinyOptions
 #' @importFrom dplyr arrange bind_rows case_when coalesce collect dense_rank desc
@@ -9,6 +12,7 @@
 #' @importFrom golem add_resource_path activate_js favicon bundle_resources with_golem_options
 #' @importFrom htmlwidgets JS
 #' @importFrom jsonlite toJSON
+#' @importFrom magrittr %>%
 #' @importFrom pool dbPool dbIsValid poolClose
 #' @importFrom purrr map_df
 #' @importFrom rio export
@@ -18,7 +22,6 @@
 #'     htmlOutput uiOutput h2 tags div moduleServer reactive eventReactive observe
 #'     observeEvent renderText renderUI updateSelectizeInput downloadHandler req
 #'     shinyApp
-#' @importFrom shinyhelper helper observe_helpers
 #' @importFrom shinyjs hide hidden show useShinyjs
 #' @importFrom stats setNames
 #' @importFrom tidyr pivot_longer
