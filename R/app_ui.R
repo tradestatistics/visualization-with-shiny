@@ -18,39 +18,30 @@ app_ui <- function(request) {
         menu_item("Products", tab_name = "pr", icon = "shopping-cart-filled"),
         menu_item("Cite", tab_name = "cite", icon = "book-filled")
       ),
-      body = list(
-        # page_header(
-        #   title_text = "Open Trade Statistics",
-        #   pretitle_text = "Overview"
-        # ),
-        body(
-          useShinyjs(),
-          useWaiter(),
-          br(),
-          tab_items(
-            tab_item(
-              tab_name = "welcome",
-              mod_welcome_ui("welcome")
-            ),
-            tab_item(
-              tab_name = "co",
-              mod_countries_ui("co")
-            ),
-            tab_item(
-              tab_name = "pr",
-              mod_products_ui("pr")
-            ),
-            tab_item(
-              tab_name = "cite",
-              mod_cite_ui("cite")
-            )
+      body = body(
+        useShinyjs(),
+        useWaiter(),
+        br(),
+        tab_items(
+          tab_item(
+            tab_name = "welcome",
+            mod_welcome_ui("welcome")
+          ),
+          tab_item(
+            tab_name = "co",
+            mod_countries_ui("co")
+          ),
+          tab_item(
+            tab_name = "pr",
+            mod_products_ui("pr")
+          ),
+          tab_item(
+            tab_name = "cite",
+            mod_cite_ui("cite")
           )
-        ),
-        footer = footer(left = "Made by Mauricio 'Pacha' Vargas Sepulveda", right = paste("Open Trade Statistics", get_year()))
-      )
-    ),
-    tags$footer(
-      tags$link(rel = "shortcut icon", href = "img/favicon.ico")
+        )
+      ),
+      footer = footer(left = "Made by Mauricio 'Pacha' Vargas Sepulveda", right = paste("Open Trade Statistics", get_year()))
     )
   )
 }
