@@ -110,6 +110,7 @@ mod_countries_ui <- function(id) {
                 htmlOutput(ns("trd_smr_imp"), container = tags$p)
               )
             ),
+            p("The chart below shows the evolution of exports and imports over the selected period."),
             fluidRow(
               col_12(
                 d3po_output(ns("trd_exc_columns_agg"), height = "500px")
@@ -128,6 +129,7 @@ mod_countries_ui <- function(id) {
           br(),
           card(
             htmlOutput(ns("exp_tt_yr"), container = tags$h2),
+            p("These charts show export destinations (bar charts) and export composition by product category (treemaps) for the first and last year."),
             fluidRow(
               col_6(
                 d3po_output(ns("exp_col_min_yr_usd"), height = "500px")
@@ -155,6 +157,7 @@ mod_countries_ui <- function(id) {
           br(),
           card(
             htmlOutput(ns("imp_tt_yr"), container = tags$h2),
+            p("These charts show import sources (bar charts) and import composition by product category (treemaps) for the first and last year."),
             fluidRow(
               col_6(
                 d3po_output(ns("imp_col_min_yr_usd"), height = "500px")
@@ -181,6 +184,7 @@ mod_countries_ui <- function(id) {
           br(),
           card(
             htmlOutput(ns("dwn_stl"), container = tags$h2),
+            p("Download the data used to generate these visualizations. Aggregated data includes yearly totals; detailed data includes trade by product category."),
             htmlOutput(ns("dwn_txt"), container = tags$p),
             uiOutput(ns("dwn_fmt")),
             br(),

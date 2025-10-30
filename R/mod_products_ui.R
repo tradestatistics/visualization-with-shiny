@@ -88,7 +88,8 @@ mod_products_ui <- function(id) {
             fluidRow(
               col_4(
                 htmlOutput(ns("trd_stl_trade"), container = tags$h4),
-                htmlOutput(ns("trd_smr_trade"), container = tags$p)
+                htmlOutput(ns("trd_smr_trade"), container = tags$p),
+                p("The chart shows global trade trends for this product category. Trade values represent the sum of all countries' imports (using mirrored data).")
               ),
               col_8(
                 d3po_output(ns("trd_exc_columns_agg"), height = "500px")
@@ -107,6 +108,7 @@ mod_products_ui <- function(id) {
           br(),
           card(
             htmlOutput(ns("exp_tt_yr"), container = tags$h2),
+            p("Bar charts show the top exporters for this product. Treemaps displays all exporters."),
             fluidRow(
               col_6(
                 d3po_output(ns("exp_col_min_yr_usd"), height = "500px")
@@ -134,6 +136,7 @@ mod_products_ui <- function(id) {
           br(),
           card(
             htmlOutput(ns("imp_tt_yr"), container = tags$h2),
+            p("Bar charts show the top importers for this product. Treemaps display all importers."),
             fluidRow(
               col_6(
                 d3po_output(ns("imp_col_min_yr_usd"), height = "500px")
@@ -160,6 +163,7 @@ mod_products_ui <- function(id) {
           br(),
           card(
             htmlOutput(ns("dwn_stl"), container = tags$h2),
+            p("Download the data behind these charts. Aggregated data shows yearly global totals; detailed data includes country-level breakdowns."),
             htmlOutput(ns("dwn_txt"), container = tags$p),
             uiOutput(ns("dwn_fmt")),
             br(),

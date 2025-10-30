@@ -355,11 +355,11 @@ mod_products_server <- function(id) {
 
     # Export column chart titles
     exp_col_min_yr_usd_tt <- eventReactive(input$go, {
-      glue("Exports in { min(inp_y()) }")
+      glue("Top Exporters in { min(inp_y()) }")
     })
 
     exp_col_max_yr_usd_tt <- eventReactive(input$go, {
-      glue("Exports in { max(inp_y()) }")
+      glue("Top Exporters in { max(inp_y()) }")
     })
 
     # Export column charts
@@ -508,7 +508,7 @@ mod_products_server <- function(id) {
       bindEvent(input$go)
 
     exp_tt_min_yr <- eventReactive(input$go, {
-      glue("Exports in { min(inp_y()) }")
+      glue("Top Exporters in { min(inp_y()) }")
     })
 
     exp_tm_dtl_min_yr <- reactive({
@@ -541,7 +541,7 @@ mod_products_server <- function(id) {
       bindEvent(input$go)
 
     exp_tt_max_yr <- eventReactive(input$go, {
-      glue("Exports in { max(inp_y()) }")
+      glue("Top Exporters in { max(inp_y()) }")
     })
 
     exp_tm_dtl_max_yr <- reactive({
@@ -583,11 +583,11 @@ mod_products_server <- function(id) {
 
     # Import column chart titles
     imp_col_min_yr_usd_tt <- eventReactive(input$go, {
-      glue("Imports in { min(inp_y()) }")
+      glue("Top Importers in { min(inp_y()) }")
     })
 
     imp_col_max_yr_usd_tt <- eventReactive(input$go, {
-      glue("Imports in { max(inp_y()) }")
+      glue("Top Importers in { max(inp_y()) }")
     })
 
     # Import column charts
@@ -741,7 +741,7 @@ mod_products_server <- function(id) {
       bindEvent(input$go)
 
     imp_tt_min_yr <- eventReactive(input$go, {
-      glue("Imports in { min(inp_y()) }")
+      glue("Top Importers in { min(inp_y()) }")
     })
 
     imp_tm_dtl_min_yr <- reactive({
@@ -774,7 +774,7 @@ mod_products_server <- function(id) {
       bindEvent(input$go)
 
     imp_tt_max_yr <- eventReactive(input$go, {
-      glue("Imports in { max(inp_y()) }")
+      glue("Top Importers in { max(inp_y()) }")
     })
 
     imp_tm_dtl_max_yr <- reactive({
