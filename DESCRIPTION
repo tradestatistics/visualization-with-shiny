@@ -32,8 +32,7 @@ Imports:
     shinyjs (>= 2.1.0),
     stats,
     tabler,
-    tidyr (>= 1.2.0),
-    waiter
+    tidyr (>= 1.2.0)
 Suggests: 
     spelling (>= 2.2),
     testthat (>= 3.0.0)

@@ -68,10 +68,8 @@ mod_products_server <- function(id) {
 
     ## Data ----
 
-    w <- Waiter$new("waiter-content", color = transparent(.5), html = spin_3())
-
     df_agg <- reactive({
-      w$show()
+      session$sendCustomMessage("showProgress", list(text = "Loading data..."))
 
       # evaluate reactives locally to avoid unquoting closures inside tbl() pipelines
       yrs <- inp_y()
@@ -806,7 +804,7 @@ mod_products_server <- function(id) {
 
       out <- od_treemap(d, d2, title = imp_tt_max_yr())
 
-      w$hide()
+      session$sendCustomMessage("hideProgress", list())
 
       return(out)
     }) %>%

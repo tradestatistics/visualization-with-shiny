@@ -4,7 +4,6 @@
 mod_countries_ui <- function(id) {
   ns <- NS(id)
   tagList(
-    useWaiter(),
     div(
       # Filter -----
       card(

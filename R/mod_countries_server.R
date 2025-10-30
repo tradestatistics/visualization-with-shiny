@@ -66,10 +66,8 @@ mod_countries_server <- function(id) {
 
     ## Data ----
 
-    w <- Waiter$new("waiter-content", color = transparent(.5), html = spin_3())
-
     df_agg <- reactive({
-      w$show()
+      session$sendCustomMessage("showProgress", list(text = "Loading data..."))
 
       d_base <- tbl(con, tbl_agg)
 
@@ -1639,7 +1637,7 @@ mod_countries_server <- function(id) {
 
       out <- p_treemap(d, d2, title = imp_tt_max_yr())
 
-      w$hide()
+      session$sendCustomMessage("hideProgress", list())
       return(out)
     }) %>%
       bindCache(inp_y(), inp_r(), inp_p(), inp_d()) %>%

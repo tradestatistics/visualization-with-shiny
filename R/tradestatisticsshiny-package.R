@@ -25,7 +25,6 @@
 #' @importFrom shinyjs hide hidden show useShinyjs
 #' @importFrom stats setNames
 #' @importFrom tidyr pivot_longer
-#' @importFrom waiter useWaiter Waiter spin_3 transparent
 "_PACKAGE"
 
 shinyOptions(

@@ -20,7 +20,6 @@ app_ui <- function(request) {
       ),
       body = body(
         useShinyjs(),
-        useWaiter(),
         br(),
         tab_items(
           tab_item(
@@ -64,7 +63,9 @@ golem_add_external_resources <- function() {
 
     # Include custom JS that equalizes card heights where needed and waiter helper
     tags$script(src = "www/tabler-waiter.js"),
+    tags$script(src = "www/progress-bar.js"),
     tags$link(rel = "stylesheet", type = "text/css", href = "www/tabler.css"),
-    tags$link(rel = "stylesheet", type = "text/css", href = "www/waiter.css")
+    # tags$link(rel = "stylesheet", type = "text/css", href = "www/waiter.css"),
+    tags$link(rel = "stylesheet", type = "text/css", href = "www/progress-bar.css")
   )
 }
